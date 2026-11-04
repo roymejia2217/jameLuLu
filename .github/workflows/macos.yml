@@ -33,6 +33,10 @@ jobs:
       - name: Validate Xcode project, schemes and entitlements
         run: |
           plutil -lint LuLu/LuLu.xcodeproj/project.pbxproj
+          if grep -Fq 'findProcesses(@"LuLu")' LuLu/App/Configure.m; then
+            echo "ERROR: generic LuLu process termination would affect the upstream application"
+            exit 1
+          fi
           if grep -Eq 'PROVISIONING_PROFILE_SPECIFIER.*LuLu (Application|Extension)' LuLu/LuLu.xcodeproj/project.pbxproj; then
             echo "ERROR: inherited upstream provisioning profile remains"
             exit 1

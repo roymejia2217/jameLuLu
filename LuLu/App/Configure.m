@@ -7,6 +7,7 @@
 //
 
 #import "consts.h"
+#import "../Shared/JameIdentityPolicy.h"
 #import "utilities.h"
 
 #import "Configure.h"
@@ -66,7 +67,7 @@ extern XPCDaemonClient* xpcDaemonClient;
         os_log_debug(logHandle, "network filter was not deactivated before install/upgrade");
     }
     
-    //quit any running LuLu
+    //quit other running jameLuLu instances
     // leave the system extension registered (this is an install/upgrade)
     [self quit:NO];
 
@@ -162,7 +163,7 @@ bail:
     //first, remove login item
     toggleLoginItem([NSURL fileURLWithPath:app], ACTION_UNINSTALL_FLAG);
 
-    //quit (other) LuLus, network monitor, and deactivate the system extension
+    //quit other jameLuLu instances and deactivate only its system extension
     [self quit:YES];
     
     //app found in /Apps?
@@ -228,33 +229,24 @@ bail:
     //init copy
     copy = [@"/Applications" stringByAppendingPathComponent:APP_NAME];
     
-    //end LuLu
-    // besides this running instance
-    for(NSDictionary* lulu in findProcesses(@"LuLu"))
+    // Only stop other instances of the fork. The original Objective-See LuLu
+    // must remain running; its executable name is not a safe identity check.
+    for(NSRunningApplication* peer in
+        [NSRunningApplication runningApplicationsWithBundleIdentifier:APP_ID])
     {
-        //pid
-        NSNumber* pid = 0;
-        
-        //extract pid
-        pid = lulu[KEY_PROCESS_ID];
-        
-        //skip self
-        if(pid.intValue == getpid())
-        {
-            //skip
+        if(YES != JameMayTerminateOwnedPeer(peer.bundleIdentifier,
+                                            peer.bundleURL.path,
+                                            peer.processIdentifier, getpid(),
+                                            APP_ID, APP_NAME))
             continue;
-        }
-        
-        //dbg msg
-        os_log_debug(logHandle, "terminating %{public}@", lulu);
-        
-        //kill
-        kill(pid.intValue, SIGKILL);
-    }
-    
-    //terminate NQ
-    [self terminateNetworkMonitor];
 
+        os_log(logHandle, "stopping other jameLuLu instance: %{public}@ (pid: %d)",
+               peer.bundleURL.path, peer.processIdentifier);
+
+        if(YES != [peer forceTerminate])
+            os_log_error(logHandle, "ERROR: could not terminate jameLuLu pid: %d",
+                         peer.processIdentifier);
+    }
     //need to deactivate the system extension?
     // only on uninstall — quit/upgrade leave it registered (so updates don't re-prompt)
     if(YES == deactivateExtension && YES == [extension isExtensionRunning])
@@ -367,26 +359,4 @@ bail:
     return;
 }
 
-//terminate network monitor
-// unless its the non-LuLu version
--(void)terminateNetworkMonitor
-{
-    //find match
-    // will check if LuLu's, then will terminate
-    for(NSRunningApplication* networkMonitor in [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.objective-see.Netiquette"])
-    {
-        //non LuLu instance?
-        if(YES != [networkMonitor.bundleURL.path hasPrefix:NSBundle.mainBundle.resourcePath]) continue;
-        
-        //dbg msg
-        os_log_debug(logHandle, "terminating network monitor: %{public}@", networkMonitor);
-        
-        //terminate
-        [networkMonitor terminate];
-    }
-    
-    return;
-}
-
 @end
-

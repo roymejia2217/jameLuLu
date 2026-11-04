@@ -3,6 +3,7 @@
 #define JameIdentityPolicy_h
 
 #import <Foundation/Foundation.h>
+#import <sys/types.h>
 
 // A developer Team ID is exactly 10 uppercase ASCII letters/digits.
 NS_INLINE BOOL JameValidTeamIdentifier(NSString *teamID)
@@ -29,4 +30,22 @@ NS_INLINE NSString *JameXPCSigningRequirement(NSString *bundleID, NSString *team
     return requirement;
 }
 
+// Only another instance of *this fork* may be stopped during upgrade or
+// uninstall. Never select a process by executable name ("LuLu") or PID alone.
+// This decision is intentionally testable without launching or killing apps.
+NS_INLINE BOOL JameMayTerminateOwnedPeer(NSString *candidateBundleID,
+                                          NSString *candidateBundlePath,
+                                          pid_t candidatePID,
+                                          pid_t ownPID,
+                                          NSString *expectedBundleID,
+                                          NSString *expectedBundleName)
+{
+    if (candidatePID <= 0 || ownPID <= 0 || candidatePID == ownPID ||
+        !candidateBundleID.length || !candidateBundlePath.length ||
+        !expectedBundleID.length || !expectedBundleName.length)
+        return NO;
+
+    return [candidateBundleID isEqualToString:expectedBundleID] &&
+           [candidateBundlePath.lastPathComponent isEqualToString:expectedBundleName];
+}
 #endif
