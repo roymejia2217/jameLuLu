@@ -36,6 +36,15 @@ still required before distribution.
 
 ---
 
+## Optional upstream network monitor
+
+The upstream project references a bundled `Netiquette.app` that is ignored by Git
+and absent from a fresh checkout. jameLuLu does **not** silently download or
+redistribute that unsigned/unverified binary. The optional Network Monitor menu
+entry is hidden, and the Xcode project no longer requires the missing bundle.
+The firewall itself and its connection/rule inspection are separate components.
+Reintroducing a compatible monitor requires a documented source, licensing,
+signing, integration tests, and an explicit release decision.
 ## Original LuLu project
 
 
