@@ -79,3 +79,10 @@ that restarting/upgrading/uninstalling jameLuLu does not stop the upstream
 `LuLu` process or alter its rules, preferences or Network Extension.
 `JameMayTerminateOwnedPeer` must match the fork's bundle ID and package name,
 and must reject PID zero, the current PID, and unknown identities.
+## Uninstaller state deletion boundary
+
+The privileged XPC uninstall operation must remove only
+`/Library/Application Support/jameLuLu`. It must **never** attempt to remove
+the parent `/Library/Application Support`, even when empty, or data belonging
+to `/Library/Objective-See/LuLu`. The precise path is enforced by a fail-closed
+policy helper with native Objective-C regression tests.

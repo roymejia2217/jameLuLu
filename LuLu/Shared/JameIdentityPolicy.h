@@ -30,6 +30,12 @@ NS_INLINE NSString *JameXPCSigningRequirement(NSString *bundleID, NSString *team
     return requirement;
 }
 
+// This system extension runs with elevated privileges. Uninstall may delete
+// ONLY the fork's exact state directory, never its shared parent or upstream data.
+NS_INLINE BOOL JameMayDeleteOwnState(NSString *path)
+{
+    return [path isEqualToString:@"/Library/Application Support/jameLuLu"];
+}
 // This checks package metadata, not a cryptographic code signature.
 // Do not remove or replace a package whose identity cannot be read.
 NS_INLINE BOOL JameIsOwnedBundle(NSString *candidateBundleID,

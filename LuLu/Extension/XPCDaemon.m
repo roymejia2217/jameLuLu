@@ -11,6 +11,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
+#import "../Shared/JameIdentityPolicy.h"
 #import "Profiles.h"
 #import "XPCDaemon.h"
 #import "utilities.h"
@@ -262,6 +263,14 @@ bail:
     //init path w/ install dir
     path = INSTALL_DIRECTORY;
     
+    // Never let a configuration regression or malicious request broaden cleanup
+    // to /Library/Application Support or an unrelated application directory.
+    if(YES != JameMayDeleteOwnState(path))
+    {
+        os_log_error(logHandle, "ERROR: refusing unsafe uninstall path: %{public}@", path);
+        reply(NO);
+        return;
+    }
     //remove install directory
     if(YES != [NSFileManager.defaultManager removeItemAtPath:path error:&error])
     {
@@ -275,30 +284,6 @@ bail:
         
         //happy
         uninstalled = YES;
-    }
-    
-    //up to Obj-See's install dir
-    path = [path stringByDeletingLastPathComponent];
-    
-    //no other Obj-See tools?
-    // remove the Obj-See directory too
-    if( (0 == [[NSFileManager.defaultManager contentsOfDirectoryAtPath:path error:&error] count]) &&
-        (nil == error) )
-    {
-        //remove
-        if(YES != [NSFileManager.defaultManager removeItemAtPath:path error:&error])
-        {
-            //err msg
-            os_log_error(logHandle, "ERROR: failed to delete %{public}@ (error: %{public}@)", path, error);
-        }
-        else
-        {
-            //dbg msg
-            os_log_debug(logHandle, "removed %{public}@", path);
-            
-            //happy
-            uninstalled = YES;
-        }
     }
     
     //return result

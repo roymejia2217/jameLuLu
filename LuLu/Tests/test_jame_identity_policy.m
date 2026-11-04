@@ -55,6 +55,17 @@ int main(void) {
         CHECK(!JameIsOwnedBundle(bundle, @"/Applications/jameLuLu.app.backup",
                                  bundle, @"jameLuLu.app"),
               "app name match must respect full component boundary");
+        // Uninstall cleanup has no authority over the shared Application Support
+        // parent directory or the original Objective-See LuLu state.
+        CHECK(JameMayDeleteOwnState(@"/Library/Application Support/jameLuLu"),
+              "uninstall may delete only its own data directory");
+        CHECK(!JameMayDeleteOwnState(@"/Library/Application Support"),
+              "uninstall must preserve the shared Application Support directory");
+        CHECK(!JameMayDeleteOwnState(@"/Library/Objective-See/LuLu"),
+              "uninstall must preserve upstream LuLu state");
+        CHECK(!JameMayDeleteOwnState(@"/Library/Application Support/jameLuLu/.."),
+              "parent traversal cannot widen the authorized deletion path");
+        CHECK(!JameMayDeleteOwnState(nil), "unknown uninstall path fails closed");
         // Process lifecycle must never terminate Objective-See's original LuLu
         // or another app with a matching process name or misleading path.
         CHECK(JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 420, 17,
