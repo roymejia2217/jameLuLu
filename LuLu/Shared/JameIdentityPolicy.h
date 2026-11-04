@@ -30,6 +30,20 @@ NS_INLINE NSString *JameXPCSigningRequirement(NSString *bundleID, NSString *team
     return requirement;
 }
 
+// This checks package metadata, not a cryptographic code signature.
+// Do not remove or replace a package whose identity cannot be read.
+NS_INLINE BOOL JameIsOwnedBundle(NSString *candidateBundleID,
+                                  NSString *candidateBundlePath,
+                                  NSString *expectedBundleID,
+                                  NSString *expectedBundleName)
+{
+    if (!candidateBundleID.length || !candidateBundlePath.length ||
+        !expectedBundleID.length || !expectedBundleName.length)
+        return NO;
+
+    return [candidateBundleID isEqualToString:expectedBundleID] &&
+           [candidateBundlePath.lastPathComponent isEqualToString:expectedBundleName];
+}
 // Only another instance of *this fork* may be stopped during upgrade or
 // uninstall. Never select a process by executable name ("LuLu") or PID alone.
 // This decision is intentionally testable without launching or killing apps.
@@ -40,12 +54,8 @@ NS_INLINE BOOL JameMayTerminateOwnedPeer(NSString *candidateBundleID,
                                           NSString *expectedBundleID,
                                           NSString *expectedBundleName)
 {
-    if (candidatePID <= 0 || ownPID <= 0 || candidatePID == ownPID ||
-        !candidateBundleID.length || !candidateBundlePath.length ||
-        !expectedBundleID.length || !expectedBundleName.length)
-        return NO;
-
-    return [candidateBundleID isEqualToString:expectedBundleID] &&
-           [candidateBundlePath.lastPathComponent isEqualToString:expectedBundleName];
+    return candidatePID > 0 && ownPID > 0 && candidatePID != ownPID &&
+           JameIsOwnedBundle(candidateBundleID, candidateBundlePath,
+                             expectedBundleID, expectedBundleName);
 }
 #endif

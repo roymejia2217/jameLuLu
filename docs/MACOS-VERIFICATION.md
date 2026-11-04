@@ -1,4 +1,4 @@
-﻿# macOS integration and acceptance checks
+# macOS integration and acceptance checks
 
 1. Configure a fork-specific Apple developer Team ID, bundle identifiers, shared
    app group and Network Extension entitlements before signing. Do not sign or
@@ -63,3 +63,19 @@ unverified release artifact behind.
 These release operations cannot be exercised by the unsigned macOS CI workflow;
 they must be verified on a Mac with your actual signing and notarization
 configuration. Never reuse Objective-See's Developer ID or provisioning profiles.
+## Safety checks for installation and coexistence
+
+On a disposable test Mac, verify that a package located at
+`/Applications/jameLuLu.app` with a different `CFBundleIdentifier` is
+**never** removed or sent to Trash by jameLuLu's install, upgrade, first-run
+relocation, or uninstall logic. Do not test by risking a real installed app:
+use a restored VM/test Mac and a harmless, independently backed-up dummy bundle.
+The check currently uses the destination bundle's metadata; it is **not**
+cryptographic proof of ownership. A signed release needs signing Team ID
+validation, TOCTOU protections and a recoverable atomic update strategy.
+
+With upstream LuLu and jameLuLu both installed on that test system, verify
+that restarting/upgrading/uninstalling jameLuLu does not stop the upstream
+`LuLu` process or alter its rules, preferences or Network Extension.
+`JameMayTerminateOwnedPeer` must match the fork's bundle ID and package name,
+and must reject PID zero, the current PID, and unknown identities.

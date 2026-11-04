@@ -59,6 +59,18 @@ extern XPCDaemonClient* xpcDaemonClient;
     //dbg msg
     os_log_debug(logHandle, "function '%s' invoked", __PRETTY_FUNCTION__);
     
+    // Refuse to overwrite any unrelated app already occupying the fork path.
+    // Validate before touching the existing network filter or running peers.
+    source = NSBundle.mainBundle.bundlePath;
+    destination = [@"/Applications" stringByAppendingPathComponent:APP_NAME];
+    if([NSFileManager.defaultManager fileExistsAtPath:destination] &&
+       YES != JameIsOwnedBundle([NSBundle bundleWithPath:destination].bundleIdentifier,
+                                destination, APP_ID, APP_NAME))
+    {
+        os_log_error(logHandle, "ERROR: refusing to replace a foreign app at %{public}@",
+                     destination);
+        goto bail;
+    }
     //disable network filter
     // ensures the provider stops before replacing the app/extension bundle
     if(YES != [[[Extension alloc] init] toggleNetworkExtension:ACTION_DEACTIVATE])
@@ -71,12 +83,6 @@ extern XPCDaemonClient* xpcDaemonClient;
     // leave the system extension registered (this is an install/upgrade)
     [self quit:NO];
 
-    //init source
-    source = NSBundle.mainBundle.bundlePath;
-    
-    //init destination
-    destination = [@"/Applications" stringByAppendingPathComponent:APP_NAME];
-    
     //remove only a previous jameLuLu.app; never touch upstream LuLu.app
     if(YES == [NSFileManager.defaultManager fileExistsAtPath:destination])
     {
@@ -147,6 +153,15 @@ bail:
     //dbg msg
     os_log_debug(logHandle, "function '%s' invoked", __PRETTY_FUNCTION__);
     
+    // An unrelated bundle must never be removed by our uninstall action.
+    if([NSFileManager.defaultManager fileExistsAtPath:app] &&
+       YES != JameIsOwnedBundle([NSBundle bundleWithPath:app].bundleIdentifier,
+                                app, APP_ID, APP_NAME))
+    {
+        os_log_error(logHandle, "ERROR: refusing to uninstall a foreign app at %{public}@", app);
+        return NO;
+    }
+
     //tell ext. to uninstall
     // remove rules, etc, etc
     if(YES != [xpcDaemonClient uninstall])
@@ -261,6 +276,17 @@ bail:
             //dbg msg
             os_log_debug(logHandle, "will spawn copy from /Applications");
             
+            // Never delete another app occupying our temporary activation path.
+            if([NSFileManager.defaultManager fileExistsAtPath:copy] &&
+               YES != JameIsOwnedBundle([NSBundle bundleWithPath:copy].bundleIdentifier,
+                                        copy, APP_ID, APP_NAME))
+            {
+                os_log_error(logHandle,
+                             "ERROR: refusing to replace a foreign app during deactivation: %{public}@",
+                             copy);
+                goto bail;
+            }
+
             //any existing?
             if(YES == [NSFileManager.defaultManager fileExistsAtPath:copy])
             {

@@ -7,6 +7,7 @@
 //
 
 #import "consts.h"
+#import "../Shared/JameIdentityPolicy.h"
 #import "utilities.h"
 
 #import "Update.h"
@@ -371,24 +372,36 @@ bail:
     //dbg msg
     os_log_debug(logHandle, "moving %{public}@ to %{public}@", NSBundle.mainBundle.bundlePath, destination);
     
-    //quit any other running LuLu
-    // e.g. an older copy (in /Applications) that's about to be replaced
-    for(NSRunningApplication* instance in [NSRunningApplication runningApplicationsWithBundleIdentifier:NSBundle.mainBundle.bundleIdentifier])
+    // Preserve an unrelated app already occupying /Applications/jameLuLu.app.
+    // A filename match alone never authorizes moving a bundle to the Trash.
+    if([NSFileManager.defaultManager fileExistsAtPath:destination] &&
+       YES != JameIsOwnedBundle([NSBundle bundleWithPath:destination].bundleIdentifier,
+                                destination, APP_ID, APP_NAME))
     {
-        //skip self
-        if(getpid() == instance.processIdentifier)
-        {
-            //skip
+        os_log_error(logHandle, "ERROR: refusing to replace a foreign app at %{public}@",
+                     destination);
+        showAlert(NSAlertStyleCritical,
+                  NSLocalizedString(@"Cannot replace an unrelated application", @"Cannot replace an unrelated application"),
+                  NSLocalizedString(@"The destination contains an app that does not belong to jameLuLu.", @"The destination contains an app that does not belong to jameLuLu."),
+                  @[NSLocalizedString(@"OK", @"OK")]);
+        goto bail;
+    }
+
+    // Stop only other jameLuLu instances; never affect upstream Objective-See LuLu.
+    for(NSRunningApplication* instance in
+        [NSRunningApplication runningApplicationsWithBundleIdentifier:APP_ID])
+    {
+        if(YES != JameMayTerminateOwnedPeer(instance.bundleIdentifier,
+                                            instance.bundleURL.path,
+                                            instance.processIdentifier, getpid(),
+                                            APP_ID, APP_NAME))
             continue;
-        }
-        
-        //dbg msg
-        os_log_debug(logHandle, "terminating other running instance: %{public}@ (pid: %d)", instance.bundleURL.path, instance.processIdentifier);
-        
-        //terminate
+
+        os_log(logHandle, "terminating other jameLuLu instance: %{public}@ (pid: %d)",
+               instance.bundleURL.path, instance.processIdentifier);
         [instance forceTerminate];
     }
-    
+
     //remove any existing copy
     // move it to the trash (recoverable), rather than deleting it
     if(YES == [NSFileManager.defaultManager fileExistsAtPath:destination])
