@@ -45,6 +45,15 @@ entry is hidden, and the Xcode project no longer requires the missing bundle.
 The firewall itself and its connection/rule inspection are separate components.
 Reintroducing a compatible monitor requires a documented source, licensing,
 signing, integration tests, and an explicit release decision.
+## CI artifacts and test gates
+
+The macOS GitHub Actions workflow compiles the Objective-C policy test executables,
+parses the Xcode project and configuration, builds the app **without signing**,
+and checks that the app and system extension are embedded under their fork-specific
+bundle IDs. It produces an archive named `jameLuLu-UNSIGNED-debug` for inspection
+only, with a SHA-256 checksum in the CI log. **Do not install this artifact as a
+working firewall**: Network Extension activation requires Apple developer signing,
+provisioning and macOS user approval. This artifact is not a release or a DMG.
 ## Original LuLu project
 
 
