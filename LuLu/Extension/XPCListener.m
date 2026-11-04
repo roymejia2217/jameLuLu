@@ -8,7 +8,7 @@
 //
 
 #import "consts.h"
-#import "JameIdentityPolicy.h"
+#import "../Shared/JameIdentityPolicy.h"
 
 #import "Rule.h"
 #import "Rules.h"

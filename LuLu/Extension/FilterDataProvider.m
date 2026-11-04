@@ -10,7 +10,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
-#import "JameFirewallPolicy.h"
+#import "../Shared/JameFirewallPolicy.h"
 #import "GrayList.h"
 #import "BlockOrAllowList.h"
 #import "utilities.h"
