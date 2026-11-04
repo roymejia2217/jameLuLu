@@ -36,6 +36,12 @@ jobs:
           plutil -lint LuLu/App/Info.plist LuLu/Extension/Info.plist
           plutil -lint LuLu/App/App.entitlements LuLu/Extension/Extension.entitlements
           xcodebuild -list -workspace lulu.xcworkspace
+          bash -n DMG/createDMG.sh
+          if env -u JAMELULU_DEVELOPER_ID -u JAMELULU_TEAM_ID -u JAMELULU_NOTARY_PROFILE bash DMG/createDMG.sh > "$RUNNER_TEMP/packaging-denial.txt" 2>&1; then
+            echo "ERROR: release packaging did not reject missing credentials"
+            exit 1
+          fi
+          grep -q JAMELULU_DEVELOPER_ID "$RUNNER_TEMP/packaging-denial.txt"
       - name: Compile application and system extension (unsigned)
         run: |
           xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
