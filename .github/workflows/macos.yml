@@ -8,7 +8,7 @@ on:
 
 jobs:
   policy-tests:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Compile and run production policy tests
@@ -23,7 +23,7 @@ jobs:
           "$RUNNER_TEMP/jame-identity-tests"
 
   unsigned-build:
-    runs-on: macos-15
+    runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
       - name: Compile application and system extension (unsigned)
