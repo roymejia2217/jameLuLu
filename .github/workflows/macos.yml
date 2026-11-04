@@ -1,0 +1,29 @@
+﻿name: macOS build and firewall policy tests
+
+on:
+  push:
+    branches: [master, 'feature/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  policy-tests:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run production policy tests
+        run: |
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation -framework NetworkExtension \
+            LuLu/Tests/test_jame_firewall_policy.m -o "$RUNNER_TEMP/jame-policy-tests"
+          "$RUNNER_TEMP/jame-policy-tests"
+
+  unsigned-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile application and system extension (unsigned)
+        run: |
+          xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
+            -configuration Debug -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            CODE_SIGNING_ALLOWED=NO build
