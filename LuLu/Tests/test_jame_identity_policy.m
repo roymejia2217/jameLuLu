@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <Security/Security.h>
 #import "../Shared/JameIdentityPolicy.h"
 
 static int failures = 0;
@@ -15,6 +16,22 @@ int main(void) {
         CHECK([req containsString:@"certificate leaf[subject.OU] = \"ABC123XYZ9\""],
               "XPC client must share the extension developer team");
         CHECK([req containsString:@"CFBundleShortVersionString"], "minimum version check retained");
+        // Verify these are actual Apple code-signing requirements, not only
+        // well-formed-looking strings. The listener passes them to Security.framework.
+        SecRequirementRef parsed = NULL;
+        OSStatus requirementStatus = SecRequirementCreateWithString(
+            (__bridge CFStringRef)req, kSecCSDefaultFlags, &parsed);
+        CHECK(requirementStatus == errSecSuccess && parsed != NULL,
+              "strict XPC requirement must parse in Apple's Security framework");
+        if (parsed) CFRelease(parsed);
+
+        NSString *legacyRequirement = JameXPCSigningRequirement(bundle, team, NO);
+        parsed = NULL;
+        requirementStatus = SecRequirementCreateWithString(
+            (__bridge CFStringRef)legacyRequirement, kSecCSDefaultFlags, &parsed);
+        CHECK(requirementStatus == errSecSuccess && parsed != NULL,
+              "legacy XPC requirement must parse in Apple's Security framework");
+        if (parsed) CFRelease(parsed);
         CHECK(JameXPCSigningRequirement(bundle, team, NO) != nil, "legacy macOS validation supported");
         CHECK(![JameXPCSigningRequirement(bundle, team, NO) containsString:@"CFBundleShortVersionString"],
               "legacy requirement need not include version");

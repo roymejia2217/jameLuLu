@@ -1,5 +1,15 @@
 # LuLu Passive Mode Improvements Tests
 
+> **Test provenance / release policy:** `test_passive_mode_improvements.m`
+> copies hostname and presentation logic into standalone mock classes.
+> Its results do **not** prove the production implementation, actual
+> Network Extension behavior, or the macOS app's UI. This legacy test runner
+> is for exploratory comparisons only, not a release gate. The authoritative
+> automated checks are the production `JameFirewallPolicy.h` and
+> `JameIdentityPolicy.h` unit tests plus the full Xcode build and analyzer
+> in `.github/workflows/macos.yml`. Signed, approved macOS runtime tests
+> remain mandatory for a release.
+
 This directory contains tests for the passive mode FQDN rule creation improvements.
 
 ## What's Tested
@@ -26,7 +36,7 @@ This directory contains tests for the passive mode FQDN rule creation improvemen
 
 ## Test Results
 
-✅ **9/9 tests pass** covering all functionality
+✅ **Historical claim: 9/9 legacy mock assertions** (not reverified as a production test)
 
 ### Before/After Examples
 
