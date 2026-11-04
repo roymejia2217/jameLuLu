@@ -48,7 +48,7 @@ signing, integration tests, and an explicit release decision.
 ## CI artifacts and test gates
 
 The macOS GitHub Actions workflow compiles the Objective-C policy test executables,
-parses the Xcode project and configuration, builds the app **without signing**,
+parses the Xcode project and configuration, statically analyzes the targets, and builds the app **without signing**,
 and checks that the app and system extension are embedded under their fork-specific
 bundle IDs. It produces an archive named `jameLuLu-UNSIGNED-debug` for inspection
 only, with a SHA-256 checksum in the CI log. **Do not install this artifact as a

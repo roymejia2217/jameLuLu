@@ -51,6 +51,11 @@ jobs:
           xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
             -configuration Debug -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
             CODE_SIGNING_ALLOWED=NO build
+      - name: Analyze app and system extension with Xcode
+        run: |
+          xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
+            -configuration Debug -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            CODE_SIGNING_ALLOWED=NO analyze
       - name: Verify unsigned app bundle and embedded system extension
         run: |
           APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Debug/jameLuLu.app"
