@@ -856,8 +856,8 @@
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.app";
 				PRODUCT_NAME = jameLuLu;
-				PROVISIONING_PROFILE_SPECIFIER = "LuLu Application";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Application";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Debug;
@@ -887,8 +887,8 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.app";
 				PRODUCT_NAME = jameLuLu;
-				PROVISIONING_PROFILE_SPECIFIER = "LuLu Application";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Application";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 			};
 			name = Release;
@@ -919,7 +919,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.extension";
 				PRODUCT_NAME = "io.github.roymejia2217.jamelulu.extension";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Extension";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SKIP_INSTALL = YES;
 			};
 			name = Debug;
@@ -949,7 +949,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.extension";
 				PRODUCT_NAME = "io.github.roymejia2217.jamelulu.extension";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Extension";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "";
 				SKIP_INSTALL = YES;
 			};
 			name = Release;

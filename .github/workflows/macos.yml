@@ -33,6 +33,10 @@ jobs:
       - name: Validate Xcode project, schemes and entitlements
         run: |
           plutil -lint LuLu/LuLu.xcodeproj/project.pbxproj
+          if grep -Eq 'PROVISIONING_PROFILE_SPECIFIER.*LuLu (Application|Extension)' LuLu/LuLu.xcodeproj/project.pbxproj; then
+            echo "ERROR: inherited upstream provisioning profile remains"
+            exit 1
+          fi
           plutil -lint LuLu/App/Info.plist LuLu/Extension/Info.plist
           plutil -lint LuLu/App/App.entitlements LuLu/Extension/Extension.entitlements
           xcodebuild -list -workspace lulu.xcworkspace
