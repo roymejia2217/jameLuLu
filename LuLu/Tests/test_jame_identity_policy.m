@@ -24,6 +24,20 @@ int main(void) {
         CHECK(JameXPCSigningRequirement(@"evil\" or true", team, YES) == nil,
               "bundle identifier cannot inject a signing expression");
         CHECK(JameXPCSigningRequirement(@"", team, YES) == nil, "missing bundle ID fails closed");
+        // Installation paths must not be replaced just because their names match.
+        CHECK(JameIsOwnedBundle(bundle, @"/Applications/jameLuLu.app",
+                                bundle, @"jameLuLu.app"),
+              "a valid existing fork bundle is eligible for replacement");
+        CHECK(!JameIsOwnedBundle(@"com.objective-see.lulu.app",
+                                 @"/Applications/jameLuLu.app", bundle, @"jameLuLu.app"),
+              "do not overwrite the original LuLu under a misleading file name");
+        CHECK(!JameIsOwnedBundle(bundle, @"/Applications/Other.app", bundle, @"jameLuLu.app"),
+              "do not overwrite another application with a misleading bundle ID");
+        CHECK(!JameIsOwnedBundle(nil, @"/Applications/jameLuLu.app", bundle, @"jameLuLu.app"),
+              "an unreadable existing bundle must fail closed");
+        CHECK(!JameIsOwnedBundle(bundle, @"/Applications/jameLuLu.app.backup",
+                                 bundle, @"jameLuLu.app"),
+              "app name match must respect full component boundary");
         // Process lifecycle must never terminate Objective-See's original LuLu
         // or another app with a matching process name or misleading path.
         CHECK(JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 420, 17,
