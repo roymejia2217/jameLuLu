@@ -1,4 +1,4 @@
-﻿#import <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import "../Shared/JameIdentityPolicy.h"
 
 static int failures = 0;
@@ -24,6 +24,34 @@ int main(void) {
         CHECK(JameXPCSigningRequirement(@"evil\" or true", team, YES) == nil,
               "bundle identifier cannot inject a signing expression");
         CHECK(JameXPCSigningRequirement(@"", team, YES) == nil, "missing bundle ID fails closed");
+        // Process lifecycle must never terminate Objective-See's original LuLu
+        // or another app with a matching process name or misleading path.
+        CHECK(JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 420, 17,
+                                        bundle, @"jameLuLu.app"),
+              "another jameLuLu instance may be stopped");
+        CHECK(!JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 17, 17,
+                                         bundle, @"jameLuLu.app"),
+              "never stop the current process");
+        CHECK(!JameMayTerminateOwnedPeer(@"com.objective-see.lulu.app",
+                                         @"/Applications/LuLu.app", 420, 17,
+                                         bundle, @"jameLuLu.app"),
+              "upstream LuLu may never be terminated");
+        CHECK(!JameMayTerminateOwnedPeer(@"com.objective-see.lulu.app",
+                                         @"/Applications/jameLuLu.app", 420, 17,
+                                         bundle, @"jameLuLu.app"),
+              "file name alone does not authorize termination");
+        CHECK(!JameMayTerminateOwnedPeer(bundle, @"/Applications/LuLu.app", 420, 17,
+                                         bundle, @"jameLuLu.app"),
+              "fork app identifier alone does not authorize a different bundle");
+        CHECK(!JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 0, 17,
+                                         bundle, @"jameLuLu.app"),
+              "reject PID zero");
+        CHECK(!JameMayTerminateOwnedPeer(nil, @"/Applications/jameLuLu.app", 420, 17,
+                                         bundle, @"jameLuLu.app"),
+              "unknown identity must not be terminated");
+        CHECK(!JameMayTerminateOwnedPeer(bundle, nil, 420, 17,
+                                         bundle, @"jameLuLu.app"),
+              "unknown bundle path must not be terminated");
     }
     if (failures) fprintf(stderr, "%d identity test(s) failed\n", failures);
     else puts("All jameLuLu identity tests passed");
