@@ -17,12 +17,15 @@ NS_INLINE NSString *JameRulePathForSelection(NSString *path, BOOL isDirectory)
 NS_INLINE BOOL JamePathMatchesDirectoryRule(NSString *processPath, NSString *rulePath)
 {
     if (!processPath.length || ![rulePath hasPrefix:@"/"] || ![rulePath hasSuffix:@"/*"]) return NO;
-    // Standardize before prefix matching: a path with /../ must not escape the selected directory.
-    NSString *normalizedPath = [processPath stringByStandardizingPath];
-    NSString *directory = [[rulePath substringToIndex:rulePath.length - 1] stringByStandardizingPath];
+    // Match filesystem identity, not a lexical alias. A link inside a
+    // protected .app may point outside it; a link outside may point into it.
+    // Canonicalize both sides to preserve the directory boundary in either case.
+    NSString *resolvedPath = [[[processPath stringByStandardizingPath]
+                                stringByResolvingSymlinksInPath] stringByStandardizingPath];
+    NSString *directory = [[[[rulePath substringToIndex:rulePath.length - 1]
+                              stringByStandardizingPath] stringByResolvingSymlinksInPath]
+                            stringByStandardizingPath];
     NSString *prefix = [directory isEqualToString:@"/"] ? @"/" : [directory stringByAppendingString:@"/"];
-    if ([normalizedPath hasPrefix:prefix]) return YES;
-    NSString *resolvedPath = [[normalizedPath stringByResolvingSymlinksInPath] stringByStandardizingPath];
     return [resolvedPath hasPrefix:prefix];
 }
 
