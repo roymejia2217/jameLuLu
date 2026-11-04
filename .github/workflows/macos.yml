@@ -2,7 +2,7 @@ name: macOS build and firewall policy tests
 
 on:
   push:
-    branches: [master, 'feature/**']
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
@@ -30,6 +30,12 @@ jobs:
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4
+      - name: Validate Xcode project, schemes and entitlements
+        run: |
+          plutil -lint LuLu/LuLu.xcodeproj/project.pbxproj
+          plutil -lint LuLu/App/Info.plist LuLu/Extension/Info.plist
+          plutil -lint LuLu/App/App.entitlements LuLu/Extension/Extension.entitlements
+          xcodebuild -list -workspace lulu.xcworkspace
       - name: Compile application and system extension (unsigned)
         run: |
           xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
