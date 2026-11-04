@@ -10,7 +10,7 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>$(TeamIdentifierPrefix)com.objective-see.lulu</string>
+		<string>$(TeamIdentifierPrefix)io.github.roymejia2217.jamelulu</string>
 	</array>
 </dict>
 </plist>

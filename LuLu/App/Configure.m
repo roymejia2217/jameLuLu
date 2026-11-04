@@ -76,7 +76,7 @@ extern XPCDaemonClient* xpcDaemonClient;
     //init destination
     destination = [@"/Applications" stringByAppendingPathComponent:APP_NAME];
     
-    //remove any existing LuLu.app
+    //remove only a previous jameLuLu.app; never touch upstream LuLu.app
     if(YES == [NSFileManager.defaultManager fileExistsAtPath:destination])
     {
         //not us?

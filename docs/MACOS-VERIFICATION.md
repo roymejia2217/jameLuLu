@@ -33,3 +33,33 @@ connection direction, process executable path and result for each test.
 
 **Release gate:** No macOS installer/DMG should be published before successful
 signed-provider runtime tests and clean coexistence testing with existing LuLu.
+
+## Signed DMG packaging — release gate, not yet validated
+
+An unsigned GitHub Actions build is **not** a functioning firewall. To test the
+system extension on an actual Mac, rebuild/sign the application and embedded
+extension in Xcode using an authorized Apple Developer team and the
+`content-filter-provider-systemextension` capability. Install the required
+Developer ID provisioning profiles, activate the system extension and content
+filter, and complete the runtime acceptance checks above.
+
+Once an already signed `jameLuLu.app` has passed those tests, the repository's
+`DMG/createDMG.sh` can create a distributable image using macOS's standard
+`codesign`, `hdiutil`, `notarytool`, `stapler`, and `spctl` utilities.
+The packager requires these environment variables:
+
+- `JAMELULU_DEVELOPER_ID`: your own **Developer ID Application** signing identity.
+- `JAMELULU_TEAM_ID`: the corresponding 10-character Apple Team ID.
+- `JAMELULU_NOTARY_PROFILE`: a local notarytool keychain profile (set up with
+  `xcrun notarytool store-credentials`).
+
+Run `bash DMG/createDMG.sh /path/to/signed/jameLuLu.app /path/to/output-directory`.
+The script checks both bundle identifiers, validates signatures and signing
+Team IDs, refuses to overwrite an existing output, signs the DMG and requires an
+**Accepted** notarization status plus stapling and Gatekeeper assessment before
+reporting success. It deletes a failed/incomplete DMG rather than leaving an
+unverified release artifact behind.
+
+These release operations cannot be exercised by the unsigned macOS CI workflow;
+they must be verified on a Mac with your actual signing and notarization
+configuration. Never reuse Objective-See's Developer ID or provisioning profiles.

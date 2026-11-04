@@ -1,4 +1,4 @@
-﻿#import <Foundation/Foundation.h>
+#import <Foundation/Foundation.h>
 #import "../Shared/JameFirewallPolicy.h"
 
 static int failures = 0;
@@ -29,6 +29,14 @@ int main(void) {
               "directory boundary prevents neighboring bundle matches");
         CHECK(!JamePathMatchesDirectoryRule(@"/Applications/Adobe Photoshop.app", rule),
               "directory rules target contents, not the directory path itself");
+        CHECK(!JamePathMatchesDirectoryRule(
+                  @"/Applications/Adobe Photoshop.app/../Unrelated.app/Contents/MacOS/Unrelated", rule),
+              "parent-directory traversal must not block an unrelated executable");
+        CHECK(!JamePathMatchesDirectoryRule(
+                  @"/Applications/Adobe Photoshop.app/Contents/../../Other.app/Contents/MacOS/Other", rule),
+              "nested traversal must not escape the selected app bundle");
+        CHECK(JamePathMatchesDirectoryRule(@"/usr/bin/curl", @"/*"),
+              "intentional root-directory rule covers nested executables");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionInbound), "inbound connections are processed");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
         CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");

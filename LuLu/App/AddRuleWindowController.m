@@ -8,7 +8,7 @@
 //
 
 #import "consts.h"
-#import "JameFirewallPolicy.h"
+#import "../Shared/JameFirewallPolicy.h"
 #import "utilities.h"
 #import "AddRuleWindowController.h"
 

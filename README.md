@@ -30,12 +30,30 @@ See [macOS verification](docs/MACOS-VERIFICATION.md).
 
 **Signing:** Apple's Network Extension and system-extension capabilities require
 appropriate developer signing and user approval. The CI build is unsigned and
-**must not be represented as an installable firewall release**. The inherited
-upstream signing identifiers, bundle IDs, and service naming require an isolated
-fork-specific migration before distribution.
+**must not be represented as an installable firewall release**. The source uses fork-specific app, extension, app-group, XPC and storage identifiers,
+but production signing, entitlement provisioning, notarization and installer QA are
+still required before distribution.
 
 ---
 
+## Optional upstream network monitor
+
+The upstream project references a bundled `Netiquette.app` that is ignored by Git
+and absent from a fresh checkout. jameLuLu does **not** silently download or
+redistribute that unsigned/unverified binary. The optional Network Monitor menu
+entry is hidden, and the Xcode project no longer requires the missing bundle.
+The firewall itself and its connection/rule inspection are separate components.
+Reintroducing a compatible monitor requires a documented source, licensing,
+signing, integration tests, and an explicit release decision.
+## CI artifacts and test gates
+
+The macOS GitHub Actions workflow compiles the Objective-C policy test executables,
+parses the Xcode project and configuration, builds the app **without signing**,
+and checks that the app and system extension are embedded under their fork-specific
+bundle IDs. It produces an archive named `jameLuLu-UNSIGNED-debug` for inspection
+only, with a SHA-256 checksum in the CI log. **Do not install this artifact as a
+working firewall**: Network Extension activation requires Apple developer signing,
+provisioning and macOS user approval. This artifact is not a release or a DMG.
 ## Original LuLu project
 
 

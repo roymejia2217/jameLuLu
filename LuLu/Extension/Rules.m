@@ -11,7 +11,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
-#import "JameFirewallPolicy.h"
+#import "../Shared/JameFirewallPolicy.h"
 #import "Process.h"
 #import "utilities.h"
 #import "Preferences.h"

@@ -39,25 +39,22 @@ typedef NS_ENUM(NSInteger, EndpointType) {
 #define OBJECTIVE_SEE_VENDOR "com.objectiveSee"
 
 //bundle ID
-#define BUNDLE_ID "com.objective-see.lulu"
+#define BUNDLE_ID "io.github.roymejia2217.jamelulu"
 
 //extension bundle ID
-#define EXT_BUNDLE_ID @"com.objective-see.lulu.extension"
+#define EXT_BUNDLE_ID @"io.github.roymejia2217.jamelulu.extension"
 
 //main app bundle id
-#define APP_ID @"com.objective-see.lulu.app"
-
-//signing auth
-#define SIGNING_AUTH @"Developer ID Application: Objective-See, LLC (VBG97UB4TA)"
+#define APP_ID @"io.github.roymejia2217.jamelulu.app"
 
 //firewall event: new flow
-#define LULU_EVENT @"com.objective-see.lulu.event"
+#define LULU_EVENT @"io.github.roymejia2217.jamelulu.event"
 
 //lulu service
-#define LULU_SERVICE_NAME "com_objective_see_firewall"
+#define LULU_SERVICE_NAME "com_roymejia_jamelulu_firewall"
 
 //install directory
-#define INSTALL_DIRECTORY @"/Library/Objective-See/LuLu"
+#define INSTALL_DIRECTORY @"/Library/Application Support/jameLuLu"
 
 //preferences file
 #define PREFS_FILE @"preferences.plist"
@@ -84,7 +81,7 @@ typedef NS_ENUM(NSInteger, EndpointType) {
 #define SETTINGS_SECURITY_URL @"x-apple.systempreferences:com.apple.preference.security?General"
 
 //extension (bundle) path, within app
-#define EXT_BUNDLE_PATH @"Contents/Library/SystemExtensions/com.objective-see.lulu.extension.systemextension"
+#define EXT_BUNDLE_PATH @"Contents/Library/SystemExtensions/io.github.roymejia2217.jamelulu.extension.systemextension"
 
 //rule state; not found
 #define RULE_STATE_NOT_FOUND -1
@@ -96,13 +93,13 @@ typedef NS_ENUM(NSInteger, EndpointType) {
 #define RULE_STATE_ALLOW 1
 
 //product version url
-#define PRODUCT_VERSIONS_URL @"https://objective-see.org/products.json"
+#define PRODUCT_VERSIONS_URL @"https://raw.githubusercontent.com/roymejia2217/jameLuLu/master/products.json"
 
 //app name
-#define PRODUCT_NAME @"LuLu"
+#define PRODUCT_NAME @"jameLuLu"
 
 //product url
-#define PRODUCT_URL @"https://objective-see.org/products/lulu.html"
+#define PRODUCT_URL @"https://github.com/roymejia2217/jameLuLu"
 
 //error(s) url
 #define ERRORS_URL @"https://objective-see.org/errors.html"
@@ -257,21 +254,21 @@ typedef NS_ENUM(NSInteger, EndpointType) {
 #define KEY_ERROR_SUB_MSG @"errorSubMsg"
 
 //rules changed
-#define RULES_CHANGED @"com.objective-see.lulu.rulesChanged"
+#define RULES_CHANGED @"io.github.roymejia2217.jamelulu.rulesChanged"
 
 //extension event
-#define EXTENSION_EVENT @"com.objective-see.lulu.extensionEvent"
+#define EXTENSION_EVENT @"io.github.roymejia2217.jamelulu.extensionEvent"
 
 /* INSTALLER */
 
 //install directory
-#define INSTALL_DIRECTORY @"/Library/Objective-See/LuLu"
+#define INSTALL_DIRECTORY @"/Library/Application Support/jameLuLu"
 
 //launch daemon name
 #define LAUNCH_DAEMON_BINARY @"LuLu"
 
 //launch daemon plist
-#define LAUNCH_DAEMON_PLIST @"com.objective-see.lulu.plist"
+#define LAUNCH_DAEMON_PLIST @"io.github.roymejia2217.jamelulu.plist"
 
 //installed apps file
 #define INSTALLED_APPS @"installedApps"
@@ -314,7 +311,7 @@ typedef NS_ENUM(NSInteger, EndpointType) {
 #define ACTION_NEXT_FLAG 3
 
 //app name
-#define APP_NAME @"LuLu.app"
+#define APP_NAME @"jameLuLu.app"
 
 //seconds to keep the startup window floating above other apps
 #define STARTUP_WINDOW_FLOAT_DURATION 2
@@ -478,11 +475,11 @@ typedef enum {Update_Error, Update_None, Update_NotSupported, Update_Available} 
 typedef enum {Update_Channel_Stable, Update_Channel_Latest} UpdateChannel;
 
 //latest release (GitHub API)
-#define LATEST_RELEASE_URL @"https://api.github.com/repos/objective-see/LuLu/releases/latest"
+#define LATEST_RELEASE_URL @"https://api.github.com/repos/roymejia2217/jameLuLu/releases/latest"
 
 //releases page (GitHub)
 // used if a release's own page can't be determined
-#define LATEST_RELEASES_PAGE_URL @"https://github.com/objective-see/LuLu/releases"
+#define LATEST_RELEASES_PAGE_URL @"https://github.com/roymejia2217/jameLuLu/releases"
 
 //latest release: tag (key)
 #define LATEST_RELEASE_TAG @"tag_name"

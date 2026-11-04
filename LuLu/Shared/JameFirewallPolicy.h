@@ -1,4 +1,4 @@
-﻿// jameLuLu: shared, testable policy helpers. GPL-3.0-or-later.
+// jameLuLu: shared, testable policy helpers. GPL-3.0-or-later.
 #ifndef JameFirewallPolicy_h
 #define JameFirewallPolicy_h
 
@@ -17,9 +17,13 @@ NS_INLINE NSString *JameRulePathForSelection(NSString *path, BOOL isDirectory)
 NS_INLINE BOOL JamePathMatchesDirectoryRule(NSString *processPath, NSString *rulePath)
 {
     if (!processPath.length || ![rulePath hasPrefix:@"/"] || ![rulePath hasSuffix:@"/*"]) return NO;
-    NSString *prefix = [rulePath substringToIndex:rulePath.length - 1];
-    if ([processPath hasPrefix:prefix]) return YES;
-    return [[processPath stringByResolvingSymlinksInPath] hasPrefix:prefix];
+    // Standardize before prefix matching: a path with /../ must not escape the selected directory.
+    NSString *normalizedPath = [processPath stringByStandardizingPath];
+    NSString *directory = [[rulePath substringToIndex:rulePath.length - 1] stringByStandardizingPath];
+    NSString *prefix = [directory isEqualToString:@"/"] ? @"/" : [directory stringByAppendingString:@"/"];
+    if ([normalizedPath hasPrefix:prefix]) return YES;
+    NSString *resolvedPath = [[normalizedPath stringByResolvingSymlinksInPath] stringByStandardizingPath];
+    return [resolvedPath hasPrefix:prefix];
 }
 
 NS_INLINE NETrafficDirection JameNetworkRuleDirection(void)
