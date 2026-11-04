@@ -7,7 +7,7 @@
 //
 
 //FOR LOGGING:
-// % log stream --level debug --predicate="subsystem='com.objective-see.lulu'"
+// % log stream --level debug --predicate="subsystem='io.github.roymejia2217.jamelulu'"
 
 #import "main.h"
 

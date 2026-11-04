@@ -1048,7 +1048,7 @@ bail:
     
     //log msg
     // match on this if you want detailed insight into LuLu's decision
-    // log stream --level debug --predicate 'subsystem == "com.objective-see.lulu" && composedMessage BEGINSWITH "[LULU]"'
+    // log stream --level debug --predicate 'subsystem == "io.github.roymejia2217.jamelulu" && composedMessage BEGINSWITH "[LULU]"'
     os_log_debug(logHandle, "[LULU] PROCESS: %{public}@, FLOW (endpoint): %{public}@, RULE: %{public}@, verdict: %ld", process.path, ((NEFilterSocketFlow*)flow).remoteEndpoint, matchingRule, verdict);
 
     //blocked?

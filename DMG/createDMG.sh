@@ -9,6 +9,11 @@
 
 set -euo pipefail
 
+# This upstream packaging script is intentionally disabled in the jameLuLu fork.
+# Never sign an independent fork with Objective-See's original identity.
+echo "ERROR: jameLuLu packaging is blocked until fork-specific signing and notarization are implemented." >&2
+exit 2
+
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleVersion" "Release/LuLu.app/Contents/Info.plist")

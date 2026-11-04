@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "CDB2CC1724D61A4E00D0EECE"
-               BuildableName = "LuLu.app"
+               BuildableName = "jameLuLu.app"
                BlueprintName = "LuLu"
                ReferencedContainer = "container:LuLu.xcodeproj">
             </BuildableReference>
@@ -45,7 +45,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CDB2CC1724D61A4E00D0EECE"
-            BuildableName = "LuLu.app"
+            BuildableName = "jameLuLu.app"
             BlueprintName = "LuLu"
             ReferencedContainer = "container:LuLu.xcodeproj">
          </BuildableReference>
@@ -62,7 +62,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "CDB2CC1724D61A4E00D0EECE"
-            BuildableName = "LuLu.app"
+            BuildableName = "jameLuLu.app"
             BlueprintName = "LuLu"
             ReferencedContainer = "container:LuLu.xcodeproj">
          </BuildableReference>

@@ -8,6 +8,7 @@
 //
 
 #import "consts.h"
+#import "JameIdentityPolicy.h"
 
 #import "Rule.h"
 #import "Rules.h"
@@ -23,6 +24,7 @@
 
 @import OSLog;
 #import <bsm/libbsm.h>
+#import <Security/Security.h>
 
 
 /* GLOBALS */
@@ -57,6 +59,27 @@ extern FilterDataProvider* provider;
 //global logging handle
 extern os_log_t logHandle;
 
+// Pin the XPC client to the Team ID of this signed extension; never to an
+// inherited upstream certificate name or an unvalidated user-provided value.
+static NSString *JameCurrentSigningTeamIdentifier(void)
+{
+    SecCodeRef selfCode = NULL;
+    CFDictionaryRef signingInfo = NULL;
+    NSString *teamID = nil;
+
+    if(errSecSuccess == SecCodeCopySelf(kSecCSDefaultFlags, &selfCode))
+    {
+        if(errSecSuccess == SecCodeCopySigningInformation(selfCode, kSecCSSigningInformation, &signingInfo))
+        {
+            id value = ((__bridge NSDictionary *)signingInfo)[(__bridge NSString *)kSecCodeInfoTeamIdentifier];
+            if([value isKindOfClass:[NSString class]]) teamID = [value copy];
+        }
+    }
+
+    if(NULL != signingInfo) CFRelease(signingInfo);
+    if(NULL != selfCode) CFRelease(selfCode);
+    return teamID;
+}
 @implementation XPCListener
 
 @synthesize client;
@@ -81,11 +104,12 @@ extern os_log_t logHandle;
         if(@available(macOS 13.0, *)) {
         
             //init requirement
-            // LuLu client, v2.0+
-            requirement = [NSString stringWithFormat:@"anchor apple generic and identifier \"%@\" and certificate leaf [subject.CN] = \"%@\" and info [CFBundleShortVersionString] >= \"2.0.0\"", APP_ID, SIGNING_AUTH];
+            // jameLuLu client, v0.1.0+
+            requirement = JameXPCSigningRequirement(APP_ID, JameCurrentSigningTeamIdentifier(), YES);
             
             //set requirement
-            [self.listener setConnectionCodeSigningRequirement:requirement];
+            if(nil != requirement) [self.listener setConnectionCodeSigningRequirement:requirement];
+            else os_log_error(logHandle, "ERROR: no valid signed extension Team ID; XPC will be rejected");
             
             //dbg msg
             os_log_debug(logHandle, "set XPC requirement %@", requirement);
@@ -200,7 +224,12 @@ extern os_log_t logHandle;
     os_log_debug(logHandle, "client code signing flags, ok (includes 'CS_RUNTIME')");
     
     //init signing req
-    requirement = [NSString stringWithFormat:@"anchor apple generic and identifier \"%@\" and certificate leaf [subject.CN] = \"%@\"", APP_ID, SIGNING_AUTH];
+    requirement = JameXPCSigningRequirement(APP_ID, JameCurrentSigningTeamIdentifier(), NO);
+    if(nil == requirement)
+    {
+        os_log_error(logHandle, "ERROR: unsigned or invalid extension Team ID; rejecting XPC client");
+        goto bail;
+    }
     
     //step 1: create task ref
     // uses NSXPCConnection's (private) 'auditToken' iVar
@@ -212,7 +241,7 @@ extern os_log_t logHandle;
     }
     
     //step 2: validate
-    // check that client is signed with Objective-See's and it's LuLu
+    // require the fork app identifier and the same Apple Developer Team as this extension
     if(errSecSuccess != (status = SecTaskValidateForRequirement(taskRef, (__bridge CFStringRef)(requirement))))
     {
         //err msg

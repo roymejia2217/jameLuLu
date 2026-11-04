@@ -30,9 +30,9 @@ See [macOS verification](docs/MACOS-VERIFICATION.md).
 
 **Signing:** Apple's Network Extension and system-extension capabilities require
 appropriate developer signing and user approval. The CI build is unsigned and
-**must not be represented as an installable firewall release**. The inherited
-upstream signing identifiers, bundle IDs, and service naming require an isolated
-fork-specific migration before distribution.
+**must not be represented as an installable firewall release**. The source uses fork-specific app, extension, app-group, XPC and storage identifiers,
+but production signing, entitlement provisioning, notarization and installer QA are
+still required before distribution.
 
 ---
 

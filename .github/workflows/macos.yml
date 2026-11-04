@@ -1,4 +1,4 @@
-﻿name: macOS build and firewall policy tests
+name: macOS build and firewall policy tests
 
 on:
   push:
@@ -17,6 +17,10 @@ jobs:
             -framework Foundation -framework NetworkExtension \
             LuLu/Tests/test_jame_firewall_policy.m -o "$RUNNER_TEMP/jame-policy-tests"
           "$RUNNER_TEMP/jame-policy-tests"
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation \
+            LuLu/Tests/test_jame_identity_policy.m -o "$RUNNER_TEMP/jame-identity-tests"
+          "$RUNNER_TEMP/jame-identity-tests"
 
   unsigned-build:
     runs-on: macos-15

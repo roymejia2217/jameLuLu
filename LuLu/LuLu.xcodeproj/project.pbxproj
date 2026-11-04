@@ -61,7 +61,7 @@
 		CDB2CC3324D61B3900D0EECE /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CDB2CC3224D61B3900D0EECE /* NetworkExtension.framework */; };
 		CDB2CC3724D61B3900D0EECE /* FilterDataProvider.m in Sources */ = {isa = PBXBuildFile; fileRef = CDB2CC3624D61B3900D0EECE /* FilterDataProvider.m */; };
 		CDB2CC3924D61B3900D0EECE /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = CDB2CC3824D61B3900D0EECE /* main.m */; };
-		CDB2CC3E24D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = CDB2CC3024D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		CDB2CC3E24D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension in Embed System Extensions */ = {isa = PBXBuildFile; fileRef = CDB2CC3024D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CDB2CC4424DBE48100D0EECE /* NetworkExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CDB2CC3224D61B3900D0EECE /* NetworkExtension.framework */; };
 		CDB909EB2B72BC230043FEB4 /* Configure.m in Sources */ = {isa = PBXBuildFile; fileRef = CDB909EA2B72BC230043FEB4 /* Configure.m */; };
 		CDC378C7250C66C300314064 /* Extension.m in Sources */ = {isa = PBXBuildFile; fileRef = CDC378C6250C66C300314064 /* Extension.m */; };
@@ -91,7 +91,7 @@
 			dstPath = "$(SYSTEM_EXTENSIONS_FOLDER_PATH)";
 			dstSubfolderSpec = 16;
 			files = (
-				CDB2CC3E24D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension in Embed System Extensions */,
+				CDB2CC3E24D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension in Embed System Extensions */,
 			);
 			name = "Embed System Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -197,13 +197,13 @@
 		CDA136CF24F0D9C1005AD424 /* XPCDaemonClient.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = XPCDaemonClient.m; sourceTree = "<group>"; };
 		CDA136E324F0DA43005AD424 /* Rule.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = Rule.h; path = Shared/Rule.h; sourceTree = SOURCE_ROOT; };
 		CDA136E424F0DA43005AD424 /* Rule.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = Rule.m; path = Shared/Rule.m; sourceTree = SOURCE_ROOT; };
-		CDB2CC1824D61A4E00D0EECE /* LuLu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LuLu.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDB2CC1824D61A4E00D0EECE /* jameLuLu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = jameLuLu.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDB2CC1B24D61A4E00D0EECE /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		CDB2CC1C24D61A4E00D0EECE /* AppDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AppDelegate.m; sourceTree = "<group>"; };
 		CDB2CC1E24D61A5000D0EECE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CDB2CC2324D61A5000D0EECE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		CDB2CC2424D61A5000D0EECE /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
-		CDB2CC3024D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = "com.objective-see.lulu.extension.systemextension"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CDB2CC3024D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension */ = {isa = PBXFileReference; explicitFileType = "wrapper.system-extension"; includeInIndex = 0; path = "io.github.roymejia2217.jamelulu.extension.systemextension"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDB2CC3224D61B3900D0EECE /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
 		CDB2CC3524D61B3900D0EECE /* FilterDataProvider.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FilterDataProvider.h; sourceTree = "<group>"; };
 		CDB2CC3624D61B3900D0EECE /* FilterDataProvider.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FilterDataProvider.m; sourceTree = "<group>"; };
@@ -292,8 +292,8 @@
 		CDB2CC1924D61A4E00D0EECE /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CDB2CC1824D61A4E00D0EECE /* LuLu.app */,
-				CDB2CC3024D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension */,
+				CDB2CC1824D61A4E00D0EECE /* jameLuLu.app */,
+				CDB2CC3024D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -444,7 +444,7 @@
 			);
 			name = LuLu;
 			productName = TestExtension;
-			productReference = CDB2CC1824D61A4E00D0EECE /* LuLu.app */;
+			productReference = CDB2CC1824D61A4E00D0EECE /* jameLuLu.app */;
 			productType = "com.apple.product-type.application";
 		};
 		CDB2CC2F24D61B3900D0EECE /* Extension */ = {
@@ -461,7 +461,7 @@
 			);
 			name = Extension;
 			productName = Extension;
-			productReference = CDB2CC3024D61B3900D0EECE /* com.objective-see.lulu.extension.systemextension */;
+			productReference = CDB2CC3024D61B3900D0EECE /* io.github.roymejia2217.jamelulu.extension.systemextension */;
 			productType = "com.apple.product-type.system-extension";
 		};
 /* End PBXNativeTarget section */
@@ -850,9 +850,9 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4.5.7;
-				DEVELOPMENT_TEAM = VBG97UB4TA;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = VBG97UB4TA;
+				CURRENT_PROJECT_VERSION = 0.1.0;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				INFOPLIST_FILE = App/Info.plist;
@@ -864,10 +864,10 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 4.5.7;
+				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.objective-see.lulu.app";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.app";
+				PRODUCT_NAME = jameLuLu;
 				PROVISIONING_PROFILE_SPECIFIER = "LuLu Application";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Application";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -882,9 +882,9 @@
 				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 4.5.7;
-				DEVELOPMENT_TEAM = VBG97UB4TA;
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = VBG97UB4TA;
+				CURRENT_PROJECT_VERSION = 0.1.0;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				INFOPLIST_FILE = App/Info.plist;
@@ -896,9 +896,9 @@
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 4.5.7;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.objective-see.lulu.app";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.app";
+				PRODUCT_NAME = jameLuLu;
 				PROVISIONING_PROFILE_SPECIFIER = "LuLu Application";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Application";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -912,9 +912,9 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 4.5.7;
+				CURRENT_PROJECT_VERSION = 0.1.0;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = VBG97UB4TA;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				INFOPLIST_FILE = Extension/Info.plist;
@@ -926,10 +926,10 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 4.5.7;
+				MARKETING_VERSION = 0.1.0;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.objective-see.lulu.extension";
-				PRODUCT_NAME = "com.objective-see.lulu.extension";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.extension";
+				PRODUCT_NAME = "io.github.roymejia2217.jamelulu.extension";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Extension";
 				SKIP_INSTALL = YES;
@@ -943,9 +943,9 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 4.5.7;
+				CURRENT_PROJECT_VERSION = 0.1.0;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = VBG97UB4TA;
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = ;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = "";
 				INFOPLIST_FILE = Extension/Info.plist;
@@ -957,9 +957,9 @@
 				);
 				LIBRARY_SEARCH_PATHS = "";
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 4.5.7;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.objective-see.lulu.extension";
-				PRODUCT_NAME = "com.objective-see.lulu.extension";
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.roymejia2217.jamelulu.extension";
+				PRODUCT_NAME = "io.github.roymejia2217.jamelulu.extension";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=macosx*]" = "LuLu Extension";
 				SKIP_INSTALL = YES;
