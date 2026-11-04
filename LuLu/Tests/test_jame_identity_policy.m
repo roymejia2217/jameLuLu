@@ -66,6 +66,19 @@ int main(void) {
         CHECK(!JameMayDeleteOwnState(@"/Library/Application Support/jameLuLu/.."),
               "parent traversal cannot widen the authorized deletion path");
         CHECK(!JameMayDeleteOwnState(nil), "unknown uninstall path fails closed");
+        // Re-running install/upgrade from the already installed app must
+        // not deactivate the filter then attempt to copy the bundle over itself.
+        CHECK(JameBundleLocationsEqual(@"/Applications/jameLuLu.app",
+                                       @"/Applications/jameLuLu.app"),
+              "same installation source and destination is a no-op");
+        CHECK(JameBundleLocationsEqual(@"/Applications/../Applications/jameLuLu.app",
+                                       @"/Applications/jameLuLu.app"),
+              "normalized aliases to the same installed bundle are a no-op");
+        CHECK(!JameBundleLocationsEqual(@"/Users/Shared/jameLuLu.app",
+                                        @"/Applications/jameLuLu.app"),
+              "different source bundle must proceed with ordinary installation");
+        CHECK(!JameBundleLocationsEqual(nil, @"/Applications/jameLuLu.app"),
+              "unknown source must not be treated as installed");
         // Process lifecycle must never terminate Objective-See's original LuLu
         // or another app with a matching process name or misleading path.
         CHECK(JameMayTerminateOwnedPeer(bundle, @"/Applications/jameLuLu.app", 420, 17,

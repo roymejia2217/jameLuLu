@@ -36,6 +36,18 @@ NS_INLINE BOOL JameMayDeleteOwnState(NSString *path)
 {
     return [path isEqualToString:@"/Library/Application Support/jameLuLu"];
 }
+// Avoid disabling an active filter and copying a bundle onto itself.
+// Standardized physical locations also detect symlink aliases.
+NS_INLINE BOOL JameBundleLocationsEqual(NSString *source, NSString *destination)
+{
+    if (!source.length || !destination.length) return NO;
+
+    NSString *sourcePath = [[[source stringByStandardizingPath]
+                              stringByResolvingSymlinksInPath] stringByStandardizingPath];
+    NSString *destinationPath = [[[destination stringByStandardizingPath]
+                                   stringByResolvingSymlinksInPath] stringByStandardizingPath];
+    return [sourcePath isEqualToString:destinationPath];
+}
 // This checks package metadata, not a cryptographic code signature.
 // Do not remove or replace a package whose identity cannot be read.
 NS_INLINE BOOL JameIsOwnedBundle(NSString *candidateBundleID,

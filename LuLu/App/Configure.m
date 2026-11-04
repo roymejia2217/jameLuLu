@@ -71,6 +71,16 @@ extern XPCDaemonClient* xpcDaemonClient;
                      destination);
         goto bail;
     }
+    // A repeated -install/-upgrade command from the installed bundle is a
+    // no-op. Disabling the filter and copying the app onto itself fails and
+    // could leave a previously active firewall disabled.
+    if(YES == JameBundleLocationsEqual(source, destination))
+    {
+        os_log(logHandle, "jameLuLu already installed at %{public}@; no replacement needed",
+               destination);
+        installed = YES;
+        goto bail;
+    }
     //disable network filter
     // ensures the provider stops before replacing the app/extension bundle
     if(YES != [[[Extension alloc] init] toggleNetworkExtension:ACTION_DEACTIVATE])

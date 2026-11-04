@@ -86,3 +86,14 @@ The privileged XPC uninstall operation must remove only
 the parent `/Library/Application Support`, even when empty, or data belonging
 to `/Library/Objective-See/LuLu`. The precise path is enforced by a fail-closed
 policy helper with native Objective-C regression tests.
+## Idempotent in-place installation
+
+Verify that invoking `-install` or `-upgrade` from a bundle already located
+at `/Applications/jameLuLu.app` does not deactivate the running Network
+Extension or copy the app over itself. The source/destination comparison
+resolves standardized filesystem paths, including aliases. An installation
+from another directory must still perform the normal install flow.
+
+This no-op guard is separate from the unresolved atomic upgrade/rollback
+requirement. A signed production release must validate replacement failure
+recovery and service continuity on real macOS hardware.
