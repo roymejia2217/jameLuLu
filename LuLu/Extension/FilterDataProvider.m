@@ -10,6 +10,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
+#import "JameFirewallPolicy.h"
 #import "GrayList.h"
 #import "BlockOrAllowList.h"
 #import "utilities.h"
@@ -97,7 +98,7 @@ extern BlockOrAllowList* blockList;
     NSMutableArray<NEFilterRule*>* rules = nil;
 
     //network rules
-    NENetworkRule* anyOutboundRule = nil;
+    NENetworkRule* anyDirectionRule = nil;
     NENetworkRule* loopbackRule4 = nil;
     NENetworkRule* loopbackRule6 = nil;
 
@@ -133,14 +134,14 @@ extern BlockOrAllowList* blockList;
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:loopbackRule6 action:NEFilterActionFilterData]];
 
     //Rule 3:
-    // any/all outbound traffic (non-loopback)
-    anyOutboundRule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
+    // all inbound and outbound traffic (loopback included)
+    anyDirectionRule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
                                                      remotePrefix:0
                                                       localNetwork:nil
                                                        localPrefix:0
                                                           protocol:NENetworkRuleProtocolAny
-                                                         direction:NETrafficDirectionOutbound];
-    [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:anyOutboundRule action:NEFilterActionFilterData]];
+                                                         direction:JameNetworkRuleDirection()];
+    [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:anyDirectionRule action:NEFilterActionFilterData]];
 
     //init filter settings
     filterSettings = [[NEFilterSettings alloc] initWithRules:rules defaultAction:NEFilterActionAllow];
@@ -246,12 +247,12 @@ extern BlockOrAllowList* blockList;
     //log msg
     os_log_debug(logHandle, "remote endpoint: %{public}@ / url: %{public}@", remoteEndpoint, flow.URL);
     
-    //ignore non-outbound traffic
-    // even though we init'd `NETrafficDirectionOutbound`, sometimes get inbound traffic :|
-    if(NETrafficDirectionOutbound != socketFlow.direction)
+    //ignore only unsupported traffic directions
+    // both inbound and outbound flows are processed by the same saved rules
+    if(YES != JameFlowDirectionIsSupported(socketFlow.direction))
     {
         //log msg
-        os_log_debug(logHandle, "ignoring non-outbound traffic (direction: %ld)", (long)socketFlow.direction);
+        os_log_debug(logHandle, "ignoring unsupported traffic direction: %ld", (long)socketFlow.direction);
            
         //bail
         goto bail;
@@ -482,6 +483,14 @@ bail:
         goto bail;
     }
         
+    // jameLuLu: a deliberate "block entire directory" rule is a hard deny.
+    // Evaluate it before global allow lists, localhost shortcuts, and per-app rules.
+    if(nil != [rules findUnconditionalDirectoryBlock:process])
+    {
+        os_log(logHandle, "blocked by unconditional directory isolation: %{public}@", process.path);
+        verdict = kFlowVerdictBlock;
+        goto bail;
+    }
     //CHECK:
     // different logged in user?
     // just allow flow, as we don't want to block their traffic

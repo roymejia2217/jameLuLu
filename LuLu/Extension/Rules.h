@@ -50,6 +50,9 @@
 //add a rule
 -(BOOL)add:(Rule*)rule save:(BOOL)save;
 
+//find a full-directory block, regardless of other allow rules
+-(Rule*)findUnconditionalDirectoryBlock:(Process*)process;
+
 //find (matching) rule
 -(Rule*)find:(Process*)process flow:(NEFilterSocketFlow*)flow;
 

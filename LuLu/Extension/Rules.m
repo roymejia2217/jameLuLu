@@ -11,6 +11,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
+#import "JameFirewallPolicy.h"
 #import "Process.h"
 #import "utilities.h"
 #import "Preferences.h"
@@ -714,6 +715,38 @@ bail:
     return;
 }
 
+// For a user-selected directory isolation rule, deny all endpoints before
+// earlier per-app allow rules or global allow lists can override it.
+-(Rule*)findUnconditionalDirectoryBlock:(Process*)process
+{
+    if(0 == process.path.length) return nil;
+
+    @synchronized(self)
+    {
+        for(NSString* key in self.rules)
+        {
+            for(Rule* candidate in self.rules[key][KEY_RULES])
+            {
+                if(RULE_STATE_BLOCK != candidate.action.intValue ||
+                   YES == candidate.isDisabled.boolValue ||
+                   YES != [candidate.endpointAddr isEqualToString:VALUE_ANY] ||
+                   YES != [candidate.endpointPort isEqualToString:VALUE_ANY])
+                    continue;
+
+                if(nil != candidate.expiration &&
+                   NSOrderedDescending == [[NSDate date] compare:candidate.expiration])
+                    continue;
+
+                if(nil != candidate.pid && candidate.pid.intValue != process.pid)
+                    continue;
+
+                if(JamePathMatchesDirectoryRule(process.path, candidate.path))
+                    return candidate;
+            }
+        }
+    }
+    return nil;
+}
 //find (matching) rule
 -(Rule*)find:(Process*)process flow:(NEFilterSocketFlow*)flow
 {
@@ -775,19 +808,14 @@ bail:
         // i.e. any rule that's '/<anything>*'
         for(NSString* key in self.rules)
         {
-            //directory
-            NSString* directory = nil;
             
             //directory rule?
             // grab first/any rule and check
             if(YES == ((Rule*)[self.rules[key][KEY_RULES] firstObject]).isDirectory.boolValue)
             {
-                //init directory
-                // ...by removing *
-                directory = [key substringToIndex:(key.length-1)];
                 
                 //does item fall within dir?
-                if(YES == [process.path hasPrefix:directory])
+                if(JamePathMatchesDirectoryRule(process.path, key))
                 {
                     //add
                     [directoryRules addObjectsFromArray:self.rules[key][KEY_RULES]];

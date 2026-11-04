@@ -8,6 +8,7 @@
 //
 
 #import "consts.h"
+#import "JameFirewallPolicy.h"
 #import "utilities.h"
 #import "AddRuleWindowController.h"
 
@@ -281,21 +282,10 @@ bail:
     // exists/is directory
     exists = [NSFileManager.defaultManager fileExistsAtPath:path isDirectory:&isDirectory];
 
-    //if its a directory (but not bundle)
-    // add '/*' to make it directory rule
-    if( (YES == isDirectory) &&
-        (nil == [NSBundle bundleWithPath:path]))
+    // Every selected directory, including .app bundles, is a recursive rule.
+    if(YES == isDirectory)
     {
-        //no '/'?
-        // ...append it
-        if(YES != [path hasSuffix:@"/"])
-        {
-            //append
-            [path appendString:@"/"];
-        }
-        
-        //add '*' to make it a directory rule
-        [path appendString:VALUE_ANY];
+        path = [JameRulePathForSelection(path, YES) mutableCopy];
     }
     
     //invalid path?
