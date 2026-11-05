@@ -6,6 +6,7 @@
 #import <NetworkExtension/NetworkExtension.h>
 #import <Network/Network.h>
 #import <mach/mach.h>
+#import "consts.h"
 
 // Apple's sourceApp/sourceProcess audit tokens are nullable NSData values.
 // Never cast bytes to audit_token_t unless the kernel token is complete.
@@ -36,6 +37,29 @@ NS_INLINE BOOL JamePathMatchesDirectoryRule(NSString *processPath, NSString *rul
                             stringByStandardizingPath];
     NSString *prefix = [directory isEqualToString:@"/"] ? @"/" : [directory stringByAppendingString:@"/"];
     return [resolvedPath hasPrefix:prefix];
+}
+
+// Only an explicit, enabled, all-endpoint, all-port, all-protocol
+// directory Block rule is allowed to preempt regular LuLu rule precedence.
+// Protocol-specific rules must continue through ordinary flow matching.
+NS_INLINE BOOL JameIsUnconditionalDirectoryBlockForPath(
+    NSString *processPath,
+    NSString *rulePath,
+    NSNumber *action,
+    BOOL disabled,
+    NSString *endpointAddr,
+    NSString *endpointPort,
+    NSNumber *protocol)
+{
+    if(nil == action || action.integerValue != RULE_STATE_BLOCK || disabled)
+        return NO;
+    if(YES != [endpointAddr isEqualToString:VALUE_ANY] ||
+       YES != [endpointPort isEqualToString:VALUE_ANY])
+        return NO;
+    // nil means unspecified (all protocols). Zero is IPPROTO_IP/any.
+    if(nil != protocol && 0 != protocol.integerValue)
+        return NO;
+    return JamePathMatchesDirectoryRule(processPath, rulePath);
 }
 
 NS_INLINE NETrafficDirection JameNetworkRuleDirection(void)
