@@ -25,6 +25,11 @@ jobs:
             -framework Foundation -framework Security \
             LuLu/Tests/test_jame_identity_policy.m -o "$RUNNER_TEMP/jame-identity-tests"
           "$RUNNER_TEMP/jame-identity-tests"
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation \
+            LuLu/Tests/test_jame_bundle_transaction.m LuLu/App/JameBundleTransaction.m \
+            -o "$RUNNER_TEMP/jame-bundle-transaction-tests"
+          "$RUNNER_TEMP/jame-bundle-transaction-tests"
 
   unsigned-build:
     runs-on: macos-15-intel
