@@ -405,17 +405,17 @@ EndpointType endpointTypeForAddress(NSString* address)
     BOOL matches = NO;
     
     //rule action (as string)
-    NSString* action = nil;
+    NSString* actionText = nil;
     
     //init w/ allow
     if(RULE_STATE_ALLOW == self.action.integerValue)
     {
-        action = NSLocalizedString(@"Allow", "@Allow");
+        actionText = NSLocalizedString(@"Allow", "@Allow");
     }
     //init w/ block
     else if(RULE_STATE_BLOCK == self.action.integerValue)
     {
-        action = NSLocalizedString(@"Block", @"Block");
+        actionText = NSLocalizedString(@"Block", @"Block");
     }
     
     //check name, path
@@ -473,8 +473,8 @@ EndpointType endpointTypeForAddress(NSString* address)
     }
     
     //check state
-    if( (nil != action) &&
-        (YES == [action localizedCaseInsensitiveContainsString:match]) )
+    if( (nil != actionText) &&
+        (YES == [actionText localizedCaseInsensitiveContainsString:match]) )
     {
         //match
         matches = YES;
@@ -816,7 +816,7 @@ bail:
             if([protocolValue isKindOfClass:[NSString class]])
             {
                 NSString *digits = (NSString *)protocolValue;
-                NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+                NSCharacterSet *nonDigits = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789"] invertedSet];
                 if(0 == digits.length ||
                    NSNotFound != [digits rangeOfCharacterFromSet:nonDigits].location)
                 {
