@@ -37,6 +37,11 @@ jobs:
           # This runner has no approved Network Extension. In the negative
           # control the protected app MUST successfully connect, and the
           # block-mode harness MUST report eight FILTER BYPASS failures.
+          # Give the protected executable its own known directory while
+          # keeping Outside.app outside that directory. No actual filter is
+          # activated here; block mode must therefore reject all eight cases.
+          mkdir -p "$RUNNER_TEMP/jamelulu-protected-root"
+          export JAME_PROBE_BLOCK_ROOT="$RUNNER_TEMP/jamelulu-protected-root"
           set +e
           python3 LuLu/Tests/test_socket_probe.py -v > "$RUNNER_TEMP/socket-negative-control.log" 2>&1
           result=$?
