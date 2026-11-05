@@ -97,38 +97,3 @@ from another directory must still perform the normal install flow.
 This no-op guard is separate from the unresolved atomic upgrade/rollback
 requirement. A signed production release must validate replacement failure
 recovery and service continuity on real macOS hardware.
-
-## Native staged application upgrades (experimental; not a release gate pass)
-
-The app now uses `JameBundleTransaction` in both explicit install/upgrade and
-first-launch relocation. It copies the full incoming bundle to a uniquely named
-sibling on the destination volume before stopping an existing instance or
-disabling its filter. It checks the expected fork bundle identifier; refuses
-unrelated or symlinked destinations; takes a cross-process `flock` installation
-lock; checks that the installed bundle's filesystem identity has not changed
-during preparation; and uses Foundation's `replaceItemAtURL:withItemAtURL:
-backupItemName:options:resultingItemURL:error:` with
-`NSFileManagerItemReplacementWithoutDeletingBackupItem` for existing apps.
-
-The native filesystem unit tests in
-`LuLu/Tests/test_jame_bundle_transaction.m` exercise staging without
-destructive side effects, successful replacement with retained old version,
-rollback, missing source, foreign destination, destination changes during
-preparation, first-time install and explicit backup finalization.
-
-**Known release blockers**:
-- Bundle identity here means Info.plist metadata, **not** successful
-  cryptographic code-signing verification. Validate Developer Team,
-  designated requirement, code integrity and embedded Network Extension before
-  allowing a signed release.
-- LaunchServices or `open -n` success does **not** mean that the Network
-  Extension activated or filtered traffic. The previous app backup is retained
-  rather than automatically deleted; full XPC/filter health verification and a
-  durable finalization/recovery receipt are still required.
-- Validate crash/reboot recovery, application permissions, and integration
-  with system-extension updates. The presence of a backup does not prove the
-  previous filter is active. Do not claim seamless service continuity.
-- Validate symbolic links, concurrent installs, destination replacement races,
-  and rollback on a **signed** disposable Mac with the correct entitlements.
-- The cleanup of a backup must not be automated until the new filter is
-  confirmed active and the previous version has a safe rollback strategy.
