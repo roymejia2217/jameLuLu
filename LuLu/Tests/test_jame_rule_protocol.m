@@ -125,6 +125,32 @@ int main(void) {
 
         if(exported != nil) {
             NSMutableDictionary *invalid = [exported mutableCopy];
+            // Imported action is a security-sensitive policy decision:
+            // NSString.integerValue maps garbage to 0 (RULE_STATE_BLOCK).
+            // Reject malformed values rather than silently blocking an app.
+            NSMutableDictionary *alteredAction = [exported mutableCopy];
+            alteredAction[@"action"] = @"not-an-action";
+            CHECK([[Rule alloc] initFromJSON:alteredAction] == nil,
+                  "unrecognized action text must not become Block");
+            alteredAction[@"action"] = @"1extra";
+            CHECK([[Rule alloc] initFromJSON:alteredAction] == nil,
+                  "numeric prefix plus garbage must not become Allow");
+            alteredAction[@"action"] = @(-1);
+            CHECK([[Rule alloc] initFromJSON:alteredAction] == nil,
+                  "negative action is not a supported verdict");
+            alteredAction[@"action"] = @2;
+            CHECK([[Rule alloc] initFromJSON:alteredAction] == nil,
+                  "unknown numeric action is not supported");
+            alteredAction[@"action"] = @0.5;
+            CHECK([[Rule alloc] initFromJSON:alteredAction] == nil,
+                  "fractional action cannot become Block");
+            alteredAction[@"action"] = @"0";
+            CHECK([[[Rule alloc] initFromJSON:alteredAction].action isEqual:@(RULE_STATE_BLOCK)],
+                  "legacy numeric string zero remains Block");
+            alteredAction[@"action"] = @"1";
+            CHECK([[[Rule alloc] initFromJSON:alteredAction].action isEqual:@(RULE_STATE_ALLOW)],
+                  "legacy numeric string one remains Allow");
+
             invalid[@"protocol"] = @[@"invalid"];
             Rule *invalidImported = [[Rule alloc] initFromJSON:invalid];
             CHECK(invalidImported == nil,
