@@ -111,26 +111,12 @@ extern BlockOrAllowList* blockList;
     //init rules array
     rules = [NSMutableArray array];
 
-    //Rule 1:
-    // IPv4 loopback (127.0.0.0/8), any port
-    NWHostEndpoint* loopback4 = [NWHostEndpoint endpointWithHostname:@"127.0.0.0" port:@"0"];
-    loopbackRule4 = [[NENetworkRule alloc] initWithRemoteNetwork:loopback4
-                                                   remotePrefix:8
-                                                    localNetwork:nil
-                                                     localPrefix:0
-                                                        protocol:NENetworkRuleProtocolAny
-                                                       direction:NETrafficDirectionOutbound];
+    //Rule 1: IPv4 loopback 127.0.0.0/8, both directions, any port.
+    loopbackRule4 = JameBidirectionalLoopbackRule(NO);
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:loopbackRule4 action:NEFilterActionFilterData]];
 
-    //Rule 2:
-    // IPv6 loopback (::1/128), any port
-    NWHostEndpoint* loopback6 = [NWHostEndpoint endpointWithHostname:@"::1" port:@"0"];
-    loopbackRule6 = [[NENetworkRule alloc] initWithRemoteNetwork:loopback6
-                                                   remotePrefix:128
-                                                    localNetwork:nil
-                                                     localPrefix:0
-                                                        protocol:NENetworkRuleProtocolAny
-                                                       direction:NETrafficDirectionOutbound];
+    //Rule 2: IPv6 loopback ::1/128, both directions, any port.
+    loopbackRule6 = JameBidirectionalLoopbackRule(YES);
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:loopbackRule6 action:NEFilterActionFilterData]];
 
     //Rule 3:
