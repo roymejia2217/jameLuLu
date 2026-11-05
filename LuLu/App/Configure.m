@@ -11,6 +11,7 @@
 #import "utilities.h"
 
 #import "Configure.h"
+#import "JameBundleTransaction.h"
 #import "Extension.h"
 #import "XPCDaemonClient.h"
 
@@ -55,6 +56,9 @@ extern XPCDaemonClient* xpcDaemonClient;
     
     //destination
     NSString* destination = nil;
+
+    //The on-disk previous version stays available until the new app is healthy.
+    JameBundleTransaction* transaction = nil;
     
     //dbg msg
     os_log_debug(logHandle, "function '%s' invoked", __PRETTY_FUNCTION__);
@@ -81,6 +85,19 @@ extern XPCDaemonClient* xpcDaemonClient;
         installed = YES;
         goto bail;
     }
+    // Stage and verify the complete new bundle before touching the running
+    // firewall or installed app. Copy failures leave the old app untouched.
+    transaction = [[JameBundleTransaction alloc]
+                   initWithSourceURL:[NSURL fileURLWithPath:source]
+                      destinationURL:[NSURL fileURLWithPath:destination]
+                    expectedBundleID:APP_ID];
+    if(YES != [transaction prepareWithError:&error])
+    {
+        os_log_error(logHandle, "ERROR: bundle staging failed; installed app preserved: %{public}@",
+                     error);
+        goto bail;
+    }
+
     //disable network filter
     // ensures the provider stops before replacing the app/extension bundle
     if(YES != [[[Extension alloc] init] toggleNetworkExtension:ACTION_DEACTIVATE])
@@ -93,39 +110,30 @@ extern XPCDaemonClient* xpcDaemonClient;
     // leave the system extension registered (this is an install/upgrade)
     [self quit:NO];
 
-    //remove only a previous jameLuLu.app; never touch upstream LuLu.app
-    if(YES == [NSFileManager.defaultManager fileExistsAtPath:destination])
+    // Atomic same-volume replacement with a retained previous-version
+    // backup. No deletion of the installed app before staging completes.
+    if(YES != [transaction activateWithError:&error])
     {
-        //not us?
-        // remove
-        if(YES != [source isEqualToString:destination])
-        {
-            //remove
-            if(YES != [NSFileManager.defaultManager removeItemAtPath:destination error:&error])
-            {
-                //err msg
-                os_log_error(logHandle, "ERROR: failed to remove %{public}@ (error: %{public}@)", destination, error);
-                goto bail;
-            }
-        }
-    }
-    
-    //copy self into /Applications
-    if(YES != [NSFileManager.defaultManager copyItemAtPath:source toPath:destination error:&error])
-    {
-        //err msg
-        os_log_error(logHandle, "ERROR: failed to move %{public}@ to %{public}@ (error: %{public}@)", source, destination, error);
+        os_log_error(logHandle, "ERROR: bundle replacement failed: %{public}@", error);
+        // Re-enable the old network filter when an upgrade fails.
+        [[[Extension alloc] init] toggleNetworkExtension:ACTION_ACTIVATE];
         goto bail;
     }
-    
+
     //dbg msg
     os_log_debug(logHandle, "moved self into /Applications and will launch...");
     
     //now launch
     if(nil == [NSWorkspace.sharedWorkspace launchApplicationAtURL:[NSURL fileURLWithPath:destination] options:0 configuration:@{} error:&error])
     {
-        //err msg
-        os_log_error(logHandle, "ERROR: failed to launch  %{public}@, (error: %{public}@)", destination, error);
+        os_log_error(logHandle, "ERROR: failed to launch new bundle: %{public}@", error);
+        NSError* rollbackError = nil;
+        if(YES != [transaction rollbackWithError:&rollbackError])
+            os_log_fault(logHandle, "CRITICAL: automatic rollback failed: %{public}@", rollbackError);
+        else
+            [NSWorkspace.sharedWorkspace launchApplicationAtURL:[NSURL fileURLWithPath:destination]
+                                                        options:0 configuration:@{} error:NULL];
+        [[[Extension alloc] init] toggleNetworkExtension:ACTION_ACTIVATE];
         goto bail;
     }
     
@@ -133,7 +141,11 @@ extern XPCDaemonClient* xpcDaemonClient;
     installed = YES;
     
 bail:
-    
+    // Staging data and cross-process lock are released. The previous signed
+    // bundle backup is deliberately retained until an explicit health check;
+    // process launch alone does not prove the Network Extension is working.
+    [transaction discardStaging];
+
     return installed;
     
 }
