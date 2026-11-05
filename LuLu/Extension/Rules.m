@@ -908,6 +908,12 @@ bail:
             // note: * is a wildcard, meaning any match
             for(Rule* rule in rules)
             {
+                // Respect protocol-specific imported/archived rules before
+                // evaluating endpoint matches. Legacy nil/0 remains any.
+                if(YES != JameRuleProtocolMatchesSocket(
+                    rule.protocol, flow.socketProtocol, flow.socketType))
+                    continue;
+
                 //set flag: any port ('*')
                 portAny = [rule.endpointPort isEqualToString:VALUE_ANY];
                 
