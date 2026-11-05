@@ -405,6 +405,15 @@ static NSNumber *JameNormalizedRuleAction(id value)
         
         self.creation = [decoder decodeObjectOfClass:[NSDate class] forKey:NSStringFromSelector(@selector(creation))];
         self.expiration = [decoder decodeObjectOfClass:[NSDate class] forKey:NSStringFromSelector(@selector(expiration))];
+        // A missing action decodes to nil (and integerValue would become
+        // RULE_STATE_BLOCK). Never allow malformed persisted rules to
+        // re-enter policy evaluation; protocol remains optional for legacy.
+        if(nil == JameNormalizedRuleAction(self.action) ||
+           (nil != self.protocol && YES != JameValidProtocolNumber(self.protocol)))
+        {
+            os_log_error(logHandle, "ERROR: invalid archived rule action or protocol");
+            return nil;
+        }
     }
     
     return self;
