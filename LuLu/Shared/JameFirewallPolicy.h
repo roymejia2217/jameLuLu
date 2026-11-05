@@ -5,6 +5,14 @@
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
 #import <Network/Network.h>
+#import <mach/mach.h>
+
+// Apple's sourceApp/sourceProcess audit tokens are nullable NSData values.
+// Never cast bytes to audit_token_t unless the kernel token is complete.
+NS_INLINE BOOL JameHasValidAuditToken(NSData *token)
+{
+    return token.length == sizeof(audit_token_t);
+}
 
 // Bundle folders (.app) are directories too: a single rule covers all helpers.
 NS_INLINE NSString *JameRulePathForSelection(NSString *path, BOOL isDirectory)
