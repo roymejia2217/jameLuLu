@@ -235,12 +235,19 @@ int main(void) {
         CHECK([activeSnapshot[@"active"][KEY_RULES] count] == 1,
               "preparing a candidate must not change the live snapshot");
 
+        Rule *legacyExecutable = makeRule(@(IPPROTO_TCP));
+        legacyExecutable.path = @"/Applications/Scoped.app/Contents/MacOS/Scoped";
         NSDictionary *legacySnapshot = @{
-            @"legacy": @{KEY_RULES: @[activeRule]}
+            @"legacy": @{KEY_RULES: @[legacyExecutable]}
         };
         NSMutableDictionary *legacyPrepared = JamePreparedRulesSnapshot(legacySnapshot);
         CHECK([legacyPrepared[@"legacy"][KEY_PATHS] isKindOfClass:[NSMutableSet class]],
-              "legacy non-directory rules without paths must gain mutable paths");
+              "legacy executable rules without paths must gain mutable paths");
+        NSDictionary *directorySnapshot = @{
+            @"directory": @{KEY_RULES: @[activeRule]}
+        };
+        CHECK(JamePreparedRulesSnapshot(directorySnapshot)[@"directory"][KEY_PATHS] == nil,
+              "directory rules must not receive unrelated executable path sets");
 
         NSError *snapshotError = nil;
         NSData *encodedSnapshot = [NSKeyedArchiver archivedDataWithRootObject:incomingSnapshot
