@@ -25,6 +25,11 @@ jobs:
             -framework Foundation -framework Security \
             LuLu/Tests/test_jame_identity_policy.m -o "$RUNNER_TEMP/jame-identity-tests"
           "$RUNNER_TEMP/jame-identity-tests"
+      - name: Validate real socket probe fixtures (no content filter active)
+        env:
+          JAME_PROBE_EXPECT: allow
+        run: |
+          python3 LuLu/Tests/test_socket_probe.py -v
 
   unsigned-build:
     runs-on: macos-15-intel
