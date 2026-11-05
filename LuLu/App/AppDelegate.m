@@ -451,7 +451,7 @@ bail:
         [task waitUntilExit];
         launched = (task.terminationStatus == 0);
         if(!launched)
-            error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSExecutableRuntimeMismatchError
+            error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSFileReadUnknownError
                                      userInfo:@{NSLocalizedDescriptionKey:
                                                     @"The replacement application did not launch"}];
     }
