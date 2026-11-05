@@ -29,6 +29,13 @@ jobs:
             -framework Foundation -framework Security \
             LuLu/Tests/test_jame_identity_policy.m -o "$RUNNER_TEMP/jame-identity-tests"
           "$RUNNER_TEMP/jame-identity-tests"
+      - name: Compile and exercise production Rule persistence
+        run: |
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation -framework AppKit \
+            LuLu/Tests/test_jame_rule_protocol.m LuLu/Shared/Rule.m \
+            -o "$RUNNER_TEMP/jame-rule-protocol-tests"
+          "$RUNNER_TEMP/jame-rule-protocol-tests"
       - name: Validate real socket probe fixtures (no content filter active)
         env:
           JAME_PROBE_EXPECT: allow
