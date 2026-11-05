@@ -38,12 +38,28 @@ NS_INLINE NETrafficDirection JameNetworkRuleDirection(void)
 // Native tests inspect matchDirection and matchProtocol on this exact object.
 NS_INLINE NENetworkRule *JameBidirectionalCatchAllRule(void)
 {
-    return [[NENetworkRule alloc] initWithRemoteNetwork:nil
-                                          remotePrefix:0
-                                           localNetwork:nil
-                                            localPrefix:0
-                                               protocol:NENetworkRuleProtocolAny
-                                              direction:JameNetworkRuleDirection()];
+    if (@available(macOS 15.0, *))
+    {
+        return [[NENetworkRule alloc] initWithRemoteNetworkEndpoint:nil
+                                                       remotePrefix:0
+                                               localNetworkEndpoint:nil
+                                                        localPrefix:0
+                                                           protocol:NENetworkRuleProtocolAny
+                                                          direction:JameNetworkRuleDirection()];
+    }
+
+    // The modern endpoint initializer is unavailable before macOS 15.
+    // The legacy initializer remains necessary on supported older macOS.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NENetworkRule *rule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
+                                                         remotePrefix:0
+                                                          localNetwork:nil
+                                                           localPrefix:0
+                                                              protocol:NENetworkRuleProtocolAny
+                                                             direction:JameNetworkRuleDirection()];
+#pragma clang diagnostic pop
+    return rule;
 }
 
 NS_INLINE BOOL JameFlowDirectionIsSupported(NETrafficDirection direction)
