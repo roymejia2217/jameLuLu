@@ -73,6 +73,19 @@ int main(void) {
                   [[sandbox stringByAppendingPathComponent:@"Contained.app"] stringByAppendingPathComponent:@"*"]),
               "an alias resolving inside the selected bundle must be blocked");
         CHECK([fs removeItemAtPath:sandbox error:NULL], "clean temporary symlink test files");
+        // A delegated system service may supply an optional or malformed
+        // sourceProcessAuditToken. Do not dereference its bytes unless the
+        // complete kernel audit_token_t is present (or crash the provider).
+        uint8_t auditBytes[sizeof(audit_token_t)] = {0};
+        NSData *completeAudit = [NSData dataWithBytes:auditBytes length:sizeof(auditBytes)];
+        NSData *shortAudit = [NSData dataWithBytes:auditBytes length:sizeof(auditBytes) - 1];
+        NSMutableData *longAudit = [completeAudit mutableCopy];
+        [longAudit increaseLengthBy:1];
+        CHECK(!JameHasValidAuditToken(nil), "nil delegated token is invalid");
+        CHECK(!JameHasValidAuditToken([NSData data]), "empty delegated token is invalid");
+        CHECK(!JameHasValidAuditToken(shortAudit), "truncated delegated token is invalid");
+        CHECK(!JameHasValidAuditToken(longAudit), "oversized delegated token is invalid");
+        CHECK(JameHasValidAuditToken(completeAudit), "complete kernel audit token is valid");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionInbound), "inbound connections are processed");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
         CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");
