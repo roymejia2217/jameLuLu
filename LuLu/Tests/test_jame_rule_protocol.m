@@ -56,6 +56,18 @@ static Rule *makeRule(id protocol) {
     return [[Rule alloc] init:info];
 }
 
+static Rule *makeRuleWithAction(id action) {
+    NSMutableDictionary *info = [@{
+        KEY_PATH: @"/Applications/Scoped.app/*",
+        KEY_PROCESS_NAME: @"Scoped",
+        KEY_ENDPOINT_ADDR: VALUE_ANY,
+        KEY_ENDPOINT_PORT: VALUE_ANY,
+        KEY_TYPE: @(RULE_TYPE_USER)
+    } mutableCopy];
+    if(action != nil) info[KEY_ACTION] = action;
+    return [[Rule alloc] init:info];
+}
+
 static NSDictionary *exportRule(Rule *rule) {
     NSString *json = [NSString stringWithFormat:@"{%@}", [rule toJSON]];
     NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
@@ -122,6 +134,23 @@ int main(void) {
               "direct constructor does not retain a string as NSNumber");
         CHECK(makeRule([NSNull null]) == nil,
               "direct constructor rejects NSNull before integerValue access");
+
+        // The direct creation path must obey the same action contract as
+        // imported JSON: invalid values must not masquerade as Block/Allow.
+        CHECK(makeRuleWithAction(@"garbage") == nil,
+              "direct constructor rejects malformed Block text");
+        CHECK(makeRuleWithAction(@(-1)) == nil,
+              "direct constructor rejects negative actions");
+        CHECK(makeRuleWithAction(@2) == nil,
+              "direct constructor rejects unknown numeric actions");
+        CHECK(makeRuleWithAction(@0.5) == nil,
+              "direct constructor rejects fractional Block values");
+        CHECK(makeRuleWithAction(nil) == nil,
+              "direct constructor requires an explicit action");
+        CHECK(makeRuleWithAction(@(RULE_STATE_BLOCK)) != nil,
+              "direct constructor accepts Block action");
+        CHECK(makeRuleWithAction(@(RULE_STATE_ALLOW)) != nil,
+              "direct constructor accepts Allow action");
 
         if(exported != nil) {
             NSMutableDictionary *invalid = [exported mutableCopy];
