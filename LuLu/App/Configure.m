@@ -115,6 +115,18 @@ extern XPCDaemonClient* xpcDaemonClient;
     if(YES != [transaction activateWithError:&error])
     {
         os_log_error(logHandle, "ERROR: bundle replacement failed: %{public}@", error);
+        // Foundation can move the old bundle to the backup location before
+        // an unsuccessful replacement. Attempt recovery before relaunch.
+        if(transaction.backupURL)
+        {
+            NSError* rollbackError = nil;
+            if(YES != [transaction rollbackWithError:&rollbackError])
+                os_log_fault(logHandle, "CRITICAL: unable to recover previous bundle: %{public}@",
+                             rollbackError);
+        }
+        if([NSFileManager.defaultManager fileExistsAtPath:destination])
+            [NSWorkspace.sharedWorkspace launchApplicationAtURL:[NSURL fileURLWithPath:destination]
+                                                        options:0 configuration:@{} error:NULL];
         // Re-enable the old network filter when an upgrade fails.
         [[[Extension alloc] init] toggleNetworkExtension:ACTION_ACTIVATE];
         goto bail;
