@@ -12,7 +12,11 @@ concurrency:
 
 jobs:
   policy-tests:
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Compile and run production policy tests
@@ -57,7 +61,11 @@ jobs:
           echo "PASS: blocked-mode correctly rejects an unfiltered runner (8 bypasses)."
 
   unsigned-build:
-    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate Xcode project, schemes and entitlements
@@ -83,16 +91,16 @@ jobs:
       - name: Compile application and system extension (unsigned)
         run: |
           xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
-            -configuration Debug -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            -configuration Release -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
             CODE_SIGNING_ALLOWED=NO build
       - name: Analyze app and system extension with Xcode
         run: |
           xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
-            -configuration Debug -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            -configuration Release -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
             CODE_SIGNING_ALLOWED=NO analyze
       - name: Verify unsigned app bundle and embedded system extension
         run: |
-          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Debug/jameLuLu.app"
+          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Release/jameLuLu.app"
           EXT="$APP/Contents/Library/SystemExtensions/io.github.roymejia2217.jamelulu.extension.systemextension"
           test -d "$APP" && test -d "$EXT"
           test -x "$APP/Contents/MacOS/jameLuLu"
@@ -103,11 +111,11 @@ jobs:
           echo "Unsigned bundle layout verified; this does not test Network Extension activation."
       - name: Produce inspection-only debug archive
         run: |
-          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Debug/jameLuLu.app"
-          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/jameLuLu-UNSIGNED-debug.zip"
-          shasum -a 256 "$RUNNER_TEMP/jameLuLu-UNSIGNED-debug.zip"
+          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Release/jameLuLu.app"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
+          shasum -a 256 "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: jameLuLu-UNSIGNED-debug
-          path: ${{ runner.temp }}/jameLuLu-UNSIGNED-debug.zip
+          name: jameLuLu-UNSIGNED-Release-${{ matrix.runner }}
+          path: ${{ runner.temp }}/jameLuLu-UNSIGNED-Release.zip
           retention-days: 7
