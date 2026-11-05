@@ -14,6 +14,7 @@
 #import "Configure.h"
 #import "Extension.h"
 #import "AppDelegate.h"
+#import "JameBundleTransaction.h"
 
 /* GLOBALS */
 
@@ -365,6 +366,9 @@ bail:
     
     //relaunch task
     NSTask* task = nil;
+
+    // Two-phase installer: stage before stopping any peer, retain rollback.
+    JameBundleTransaction* transaction = nil;
     
     //init destination
     destination = [@"/Applications" stringByAppendingPathComponent:APP_NAME];
@@ -387,6 +391,20 @@ bail:
         goto bail;
     }
 
+    // Preflight and stage while the existing jameLuLu still runs.
+    transaction = [[JameBundleTransaction alloc]
+                   initWithSourceURL:NSBundle.mainBundle.bundleURL
+                      destinationURL:[NSURL fileURLWithPath:destination]
+                    expectedBundleID:APP_ID];
+    if(YES != [transaction prepareWithError:&error])
+    {
+        os_log_error(logHandle, "ERROR: cannot prepare installation: %{public}@", error);
+        showAlert(NSAlertStyleCritical,
+                  NSLocalizedString(@"Installation failed", @"Installation failed"),
+                  error.localizedDescription, @[NSLocalizedString(@"OK", @"OK")]);
+        goto bail;
+    }
+
     // Stop only other jameLuLu instances; never affect upstream Objective-See LuLu.
     for(NSRunningApplication* instance in
         [NSRunningApplication runningApplicationsWithBundleIdentifier:APP_ID])
@@ -402,37 +420,23 @@ bail:
         [instance forceTerminate];
     }
 
-    //remove any existing copy
-    // move it to the trash (recoverable), rather than deleting it
-    if(YES == [NSFileManager.defaultManager fileExistsAtPath:destination])
+    // Foundation performs a same-volume replacement, retaining the
+    // previous installed app for rollback if the new app cannot launch.
+    if(YES != [transaction activateWithError:&error])
     {
-        //trash
-        if(YES != [NSFileManager.defaultManager trashItemAtURL:[NSURL fileURLWithPath:destination] resultingItemURL:nil error:&error])
+        os_log_error(logHandle, "ERROR: cannot activate staged bundle: %{public}@", error);
+        if(transaction.backupURL)
         {
-            //err msg
-            os_log_error(logHandle, "ERROR: failed to remove existing %{public}@ (error: %{public}@)", destination, error);
-            
-            //show alert
-            showAlert(NSAlertStyleCritical, NSLocalizedString(@"ERROR: failed to move LuLu", @"ERROR: failed to move LuLu"), [NSString stringWithFormat:NSLocalizedString(@"Could not replace existing %@\r\n\r\n%@", @"Could not replace existing %@\r\n\r\n%@"), destination, error.localizedDescription], @[NSLocalizedString(@"OK", @"OK")]);
-            
-            //bail
-            goto bail;
+            NSError* rollbackError = nil;
+            if(YES != [transaction rollbackWithError:&rollbackError])
+                os_log_fault(logHandle, "CRITICAL: upgrade rollback failed: %{public}@", rollbackError);
         }
-    }
-    
-    //copy
-    if(YES != [NSFileManager.defaultManager copyItemAtPath:NSBundle.mainBundle.bundlePath toPath:destination error:&error])
-    {
-        //err msg
-        os_log_error(logHandle, "ERROR: failed to copy to %{public}@ (error: %{public}@)", destination, error);
-        
-        //show alert
-        showAlert(NSAlertStyleCritical, NSLocalizedString(@"ERROR: failed to move LuLu", @"ERROR: failed to move LuLu"), [NSString stringWithFormat:NSLocalizedString(@"Could not copy to %@\r\n\r\n%@", @"Could not copy to %@\r\n\r\n%@"), destination, error.localizedDescription], @[NSLocalizedString(@"OK", @"OK")]);
-        
-        //bail
+        showAlert(NSAlertStyleCritical,
+                  NSLocalizedString(@"Installation failed", @"Installation failed"),
+                  error.localizedDescription, @[NSLocalizedString(@"OK", @"OK")]);
         goto bail;
     }
-    
+
     //dbg msg
     os_log_debug(logHandle, "relaunching from %{public}@", destination);
     
@@ -441,27 +445,38 @@ bail:
     task = [[NSTask alloc] init];
     task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/open"];
     task.arguments = @[@"-n", @"-a", destination];
-    if(YES != [task launchAndReturnError:&error])
+    BOOL launched = [task launchAndReturnError:&error];
+    if(launched)
     {
-        //err msg
-        os_log_error(logHandle, "ERROR: failed to relaunch %{public}@ (error: %{public}@)", destination, error);
-        
-        //show alert
-        showAlert(NSAlertStyleCritical, NSLocalizedString(@"ERROR: failed to relaunch LuLu", @"ERROR: failed to relaunch LuLu"), [NSString stringWithFormat:NSLocalizedString(@"Could not launch %@\r\n\r\n%@", @"Could not launch %@\r\n\r\n%@"), destination, error.localizedDescription], @[NSLocalizedString(@"OK", @"OK")]);
-        
-        //bail
+        [task waitUntilExit];
+        launched = (task.terminationStatus == 0);
+        if(!launched)
+            error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSExecutableRuntimeMismatchError
+                                     userInfo:@{NSLocalizedDescriptionKey:
+                                                    @"The replacement application did not launch"}];
+    }
+    if(!launched)
+    {
+        os_log_error(logHandle, "ERROR: new jameLuLu did not launch: %{public}@", error);
+        NSError* rollbackError = nil;
+        if(YES != [transaction rollbackWithError:&rollbackError])
+            os_log_fault(logHandle, "CRITICAL: previous application could not be restored: %{public}@",
+                         rollbackError);
+        else if([NSFileManager.defaultManager fileExistsAtPath:destination])
+            [NSWorkspace.sharedWorkspace launchApplicationAtURL:[NSURL fileURLWithPath:destination]
+                                                        options:0 configuration:@{} error:NULL];
+        showAlert(NSAlertStyleCritical,
+                  NSLocalizedString(@"Could not launch jameLuLu", @"Could not launch jameLuLu"),
+                  error.localizedDescription, @[NSLocalizedString(@"OK", @"OK")]);
         goto bail;
     }
-    
-    //wait for 'open' to complete
-    [task waitUntilExit];
-    
+
     //exit (now)
     // nothing else has been initialized yet
     exit(0);
     
 bail:
-    
+    [transaction discardStaging];
     return;
 }
 
