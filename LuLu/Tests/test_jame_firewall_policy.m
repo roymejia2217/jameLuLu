@@ -77,6 +77,14 @@ int main(void) {
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
         CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");
         CHECK(JameNetworkRuleDirection() == NETrafficDirectionAny, "filter must register for both directions");
+        // Exercise the real NetworkExtension rule object used by the provider,
+        // not only a helper returning a direction enumeration.
+        NENetworkRule *catchAll = JameBidirectionalCatchAllRule();
+        CHECK(catchAll != nil, "catch-all filter network rule is constructible");
+        CHECK(catchAll.matchDirection == NETrafficDirectionAny,
+              "installed catch-all rule must match inbound AND outbound traffic");
+        CHECK(catchAll.matchProtocol == NENetworkRuleProtocolAny,
+              "installed catch-all rule must cover TCP and UDP sockets");
     }
     if (failures) fprintf(stderr, "%d firewall policy assertion(s) failed\n", failures);
     else puts("All jameLuLu policy tests passed");
