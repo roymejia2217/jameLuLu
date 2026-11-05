@@ -34,6 +34,18 @@ NS_INLINE NETrafficDirection JameNetworkRuleDirection(void)
     return NETrafficDirectionAny;
 }
 
+// Construct the actual catch-all rule used by the macOS content filter.
+// Native tests inspect matchDirection and matchProtocol on this exact object.
+NS_INLINE NENetworkRule *JameBidirectionalCatchAllRule(void)
+{
+    return [[NENetworkRule alloc] initWithRemoteNetwork:nil
+                                          remotePrefix:0
+                                           localNetwork:nil
+                                            localPrefix:0
+                                               protocol:NENetworkRuleProtocolAny
+                                              direction:JameNetworkRuleDirection()];
+}
+
 NS_INLINE BOOL JameFlowDirectionIsSupported(NETrafficDirection direction)
 {
     return direction == NETrafficDirectionOutbound || direction == NETrafficDirectionInbound;
