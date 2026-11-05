@@ -1323,8 +1323,12 @@ bail:
             // note: iterating a copy, so safe to remove from the queue in the loop
             for(NEFilterSocketFlow* flow in [self.relatedFlows[key] array])
             {
-                //pid via the flow's (kernel) audit token
-                pid_t pid = audit_token_to_pid(*(audit_token_t*)flow.sourceAppAuditToken.bytes);
+                // The audit token is optional. A malformed held flow cannot
+                // be attributed safely and must be reaped, not dereferenced.
+                NSData* sourceAudit = flow.sourceAppAuditToken;
+                pid_t pid = JameHasValidAuditToken(sourceAudit)
+                    ? audit_token_to_pid(*(audit_token_t*)sourceAudit.bytes)
+                    : 0;
 
                 //process still alive?
                 // leave its flow be (still awaiting a verdict)
