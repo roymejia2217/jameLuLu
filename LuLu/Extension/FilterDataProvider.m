@@ -135,12 +135,7 @@ extern BlockOrAllowList* blockList;
 
     //Rule 3:
     // all inbound and outbound traffic (loopback included)
-    anyDirectionRule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
-                                                     remotePrefix:0
-                                                      localNetwork:nil
-                                                       localPrefix:0
-                                                          protocol:NENetworkRuleProtocolAny
-                                                         direction:JameNetworkRuleDirection()];
+    anyDirectionRule = JameBidirectionalCatchAllRule();
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:anyDirectionRule action:NEFilterActionFilterData]];
 
     //init filter settings
