@@ -48,7 +48,7 @@ jobs:
             echo "ERROR: unfiltered connections were not rejected by the blocked-mode test"
             exit 1
           fi
-          actual="$(grep -c 'FILTER BYPASS:' "$RUNNER_TEMP/socket-negative-control.log")"
+          actual="$(grep -c '^AssertionError:.*FILTER BYPASS:' "$RUNNER_TEMP/socket-negative-control.log")"
           if [ "$actual" -ne 8 ]; then
             cat "$RUNNER_TEMP/socket-negative-control.log"
             echo "ERROR: expected 8 detected bypasses, got $actual"
