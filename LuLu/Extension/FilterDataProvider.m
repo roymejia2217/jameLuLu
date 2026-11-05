@@ -375,7 +375,7 @@ bail:
 
     //extract pid
     // note: 'audit_token_to_pid' is just a field accessor (can't fail), so only call it on a well-formed token
-    if(sizeof(audit_token_t) == flow.sourceAppAuditToken.length)
+    if(JameHasValidAuditToken(flow.sourceAppAuditToken))
     {
         //extract
         pid = audit_token_to_pid(*(audit_token_t*)flow.sourceAppAuditToken.bytes);
@@ -1400,7 +1400,8 @@ bail:
 
     //none, or same as the app's?
     // not delegated, so the socket is the app's own ...rules apply as normal
-    if( (nil == token) ||
+    if( (YES != JameHasValidAuditToken(token)) ||
+        (YES != JameHasValidAuditToken(flow.sourceAppAuditToken)) ||
         (YES == [token isEqualToData:flow.sourceAppAuditToken]) )
     {
         //bail
@@ -1432,7 +1433,8 @@ bail:
 
     //none, or same as the app's?
     // not a delegated flow
-    if( (nil == token) ||
+    if( (YES != JameHasValidAuditToken(token)) ||
+        (YES != JameHasValidAuditToken(flow.sourceAppAuditToken)) ||
         (YES == [token isEqualToData:flow.sourceAppAuditToken]) )
     {
         //bail
@@ -1463,6 +1465,14 @@ bail:
     Process* process = nil;
     
     //extract (audit) token
+    // The token is optional in Apple's API. A missing/truncated token must
+    // never reach Process init or the BSM audit_token_to_pid accessor.
+    if(YES != JameHasValidAuditToken(flow.sourceAppAuditToken))
+    {
+        os_log_error(logHandle, "ERROR: cannot create process from malformed source audit token");
+        goto bail;
+    }
+
     token = (audit_token_t*)flow.sourceAppAuditToken.bytes;
     
     //init process object, via audit token
