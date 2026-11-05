@@ -92,49 +92,54 @@ int main(void) {
         // This eligibility function is also called by Rules.m in production.
         CHECK(JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"*", nil),
               "all-protocol directory block applies to the main executable");
         CHECK(JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/Frameworks/Helper",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"*", @0),
               "an explicit any-protocol directory block covers a nested helper");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"*", @6),
               "TCP-only rule must not preempt all-protocol matching");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"*", @17),
               "UDP-only rule must not preempt all-protocol matching");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app.backup/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"*", nil),
               "sibling bundle must not be caught by unconditional block");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_ALLOW, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_ALLOW), NO,
                   @"*", @"*", nil),
               "allow directory rule cannot become a hard deny");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, YES,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), YES,
                   @"*", @"*", nil),
               "disabled directory rule must not block");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"example.com", @"*", nil),
               "host-limited directory rule is not a hard deny");
         CHECK(!JameIsUnconditionalDirectoryBlockForPath(
                   @"/Applications/Blocked.app/Contents/MacOS/main",
-                  @"/Applications/Blocked.app/*", RULE_STATE_BLOCK, NO,
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
                   @"*", @"443", nil),
               "port-limited directory rule is not a hard deny");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", nil, NO,
+                  @"*", @"*", nil),
+              "missing action must not silently become a hard block");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionInbound), "inbound connections are processed");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
         CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");
