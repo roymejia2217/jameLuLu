@@ -85,6 +85,21 @@ int main(void) {
               "installed catch-all rule must match inbound AND outbound traffic");
         CHECK(catchAll.matchProtocol == NENetworkRuleProtocolAny,
               "installed catch-all rule must cover TCP and UDP sockets");
+        // Apple's catch-all rule with nil remote/local endpoints excludes
+        // loopback. Explicit IPv4/IPv6 loopback selectors must also match
+        // both directions or a protected app could receive localhost traffic.
+        NENetworkRule *loopback4 = JameBidirectionalLoopbackRule(NO);
+        NENetworkRule *loopback6 = JameBidirectionalLoopbackRule(YES);
+        CHECK(loopback4 != nil && loopback6 != nil,
+              "both loopback families must register concrete filter rules");
+        CHECK(loopback4.matchDirection == NETrafficDirectionAny,
+              "IPv4 loopback must be filtered inbound AND outbound");
+        CHECK(loopback6.matchDirection == NETrafficDirectionAny,
+              "IPv6 loopback must be filtered inbound AND outbound");
+        CHECK(loopback4.matchProtocol == NENetworkRuleProtocolAny &&
+              loopback6.matchProtocol == NENetworkRuleProtocolAny,
+              "IPv4 and IPv6 loopback must cover TCP and UDP");
+
     }
     if (failures) fprintf(stderr, "%d firewall policy assertion(s) failed\n", failures);
     else puts("All jameLuLu policy tests passed");
