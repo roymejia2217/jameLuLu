@@ -38,6 +38,19 @@ EndpointType endpointTypeForAddress(NSString* address)
     return EndpointTypeExact;
 }
 
+// Reject malformed protocol metadata at the rule-construction boundary.
+// IP protocol numbers are unsigned 8-bit values. Do not coerce NSString,
+// NSNull, negative or fractional values into an unrestricted rule.
+static BOOL JameValidProtocolNumber(id value)
+{
+    if(YES != [value isKindOfClass:[NSNumber class]]) return NO;
+
+    NSNumber *number = (NSNumber *)value;
+    NSInteger protocolValue = number.integerValue;
+    return protocolValue >= 0 && protocolValue <= UINT8_MAX &&
+           number.doubleValue == (double)protocolValue;
+}
+
 @implementation Rule
 
 @synthesize scope;
@@ -137,8 +150,16 @@ EndpointType endpointTypeForAddress(NSString* address)
             self.endpointHost = remoteURL.host;
         }
         
-        //set proto
-        self.protocol = info[KEY_PROTOCOL];
+        // Optional for legacy rules, but a supplied value must be a valid
+        // numeric protocol before it can reach the flow matcher or archives.
+        id protocolValue = info[KEY_PROTOCOL];
+        if(nil != protocolValue && YES != JameValidProtocolNumber(protocolValue))
+        {
+            os_log_error(logHandle, "ERROR: invalid rule protocol type or value: %{public}@", [protocolValue class]);
+            self = nil;
+            return self;
+        }
+        self.protocol = protocolValue;
     
         //set type
         self.type = info[KEY_TYPE];
