@@ -68,6 +68,15 @@ static Rule *makeRuleWithAction(id action) {
     return [[Rule alloc] init:info];
 }
 
+static Rule *reloadRule(Rule *rule) {
+    NSError *error = nil;
+    NSData *data = [NSKeyedArchiver archivedDataWithRootObject:rule
+                                        requiringSecureCoding:YES error:&error];
+    if(data == nil || error != nil) return nil;
+    return [NSKeyedUnarchiver unarchivedObjectOfClass:[Rule class]
+                                             fromData:data error:&error];
+}
+
 static NSDictionary *exportRule(Rule *rule) {
     NSString *json = [NSString stringWithFormat:@"{%@}", [rule toJSON]];
     NSData *data = [json dataUsingEncoding:NSUTF8StringEncoding];
@@ -114,6 +123,29 @@ int main(void) {
                                                  fromData:legacyArchive error:&error];
         CHECK(legacyReloaded != nil && legacyReloaded.protocol == nil,
               "legacy keyed rules without protocol remain compatible");
+
+        // A saved rule must not reintroduce an invalid Block/Allow state.
+        // Reload the actual production Rule through secure keyed archiving.
+        Rule *missingActionArchive = makeRule(@(IPPROTO_TCP));
+        missingActionArchive.action = nil;
+        CHECK(reloadRule(missingActionArchive) == nil,
+              "keyed archive missing action must be rejected");
+        Rule *invalidActionArchive = makeRule(@(IPPROTO_TCP));
+        invalidActionArchive.action = @2;
+        CHECK(reloadRule(invalidActionArchive) == nil,
+              "keyed archive with unknown action must be rejected");
+        Rule *fractionalActionArchive = makeRule(@(IPPROTO_TCP));
+        fractionalActionArchive.action = @0.5;
+        CHECK(reloadRule(fractionalActionArchive) == nil,
+              "keyed archive with fractional action must not become Block");
+        Rule *invalidProtocolArchive = makeRule(@(IPPROTO_TCP));
+        invalidProtocolArchive.protocol = @(-1);
+        CHECK(reloadRule(invalidProtocolArchive) == nil,
+              "keyed archive with negative protocol must be rejected");
+        Rule *oversizedProtocolArchive = makeRule(@(IPPROTO_TCP));
+        oversizedProtocolArchive.protocol = @256;
+        CHECK(reloadRule(oversizedProtocolArchive) == nil,
+              "keyed archive with out-of-range protocol must be rejected");
 
         // The production Rule.init: constructor receives dictionaries from
         // ordinary rule creation and XPC. Reject invalid protocol types/ranges
