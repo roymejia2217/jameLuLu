@@ -1,9 +1,11 @@
 """Real TCP/UDP loopback probes from executables inside and outside .app bundles.
 
 The default (allow) mode is only a transport-fixture sanity check.
-JAME_PROBE_EXPECT=block must run exclusively on a signed, activated
-Network Extension test host with an explicit Block /any endpoint rule for
-the generated Protected.app folder. It MUST fail on an unfiltered runner.
+JAME_PROBE_EXPECT=block must run on a host with a signed, activated
+Network Extension and a persistent directory Block rule covering the existing
+directory named by JAME_PROBE_BLOCK_ROOT. The rule must include all endpoints,
+ports and protocols; Outside.app must remain outside this blocked root.
+An unfiltered runner must FAIL with FILTER BYPASS (negative control).
 """
 import os
 import plistlib
@@ -14,7 +16,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
 SOURCE = Path(__file__).with_name("socket_probe.c")
 EXPECT = os.environ.get("JAME_PROBE_EXPECT", "allow")
 if EXPECT not in ("allow", "block"):
@@ -25,7 +26,21 @@ class RealSocketBundleProbes(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="jamelulu-socket-")
+        cls.protected_tmp = None
         root = Path(cls.tmp.name)
+        protected_root = root
+        configured_root = os.environ.get("JAME_PROBE_BLOCK_ROOT")
+        if EXPECT == "block" and configured_root:
+            parent = Path(configured_root)
+            if parent.is_symlink() or not parent.is_dir():
+                raise RuntimeError("JAME_PROBE_BLOCK_ROOT must be an existing, real directory")
+            parent = parent.resolve()
+            if parent == Path("/") or os.path.commonpath((str(root.resolve()), str(parent))) == str(parent):
+                raise RuntimeError("Blocked root must not contain the unrelated control application")
+            cls.protected_tmp = tempfile.TemporaryDirectory(
+                prefix="jamelulu-protected-fixture-", dir=parent
+            )
+            protected_root = Path(cls.protected_tmp.name)
         binary = root / "socket_probe"
         subprocess.run(
             ["clang", "-std=c11", "-Wall", "-Wextra", "-Werror",
@@ -34,7 +49,8 @@ class RealSocketBundleProbes(unittest.TestCase):
         )
         cls.apps = {}
         for name in ("Protected", "Outside"):
-            app = root / f"{name}.app"
+            app_root = protected_root if name == "Protected" else root
+            app = app_root / f"{name}.app"
             contents = app / "Contents"
             executable = contents / "MacOS" / "socket_probe"
             executable.parent.mkdir(parents=True)
@@ -49,6 +65,8 @@ class RealSocketBundleProbes(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        if cls.protected_tmp is not None:
+            cls.protected_tmp.cleanup()
         cls.tmp.cleanup()
 
     def exercise(self, family, transport, server, client):
