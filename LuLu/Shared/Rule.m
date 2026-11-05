@@ -108,7 +108,13 @@ EndpointType endpointTypeForAddress(NSString* address)
             // nil? default to all ('*')
             self.endpointAddr = (nil != info[KEY_ENDPOINT_ADDR]) ? info[KEY_ENDPOINT_ADDR] : VALUE_ANY;
             
-            //endpoint addr match type {exact, regex, cidr}
+            // An absent field in older exports means any protocol.
+    if(nil != self.protocol)
+    {
+        [json appendFormat:@"\\\"%@\\\" : %d,", NSStringFromSelector(@selector(protocol)), self.protocol.intValue];
+    }
+
+    //endpoint addr match type {exact, regex, cidr}
             self.isEndpointAddrRegex = [info[KEY_ENDPOINT_ADDR_IS_REGEX] integerValue];
             
             //init port
@@ -346,6 +352,9 @@ EndpointType endpointTypeForAddress(NSString* address)
         self.isEndpointAddrRegex = (nil != endpointAddrType) ? endpointAddrType.integerValue : endpointTypeForAddress(self.endpointAddr);
         self.endpointHost = [decoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(endpointHost))];
         self.endpointPort = [decoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(endpointPort))];
+        // Optional in legacy archives; nil continues to match every protocol.
+        self.protocol = [decoder decodeObjectOfClass:[NSNumber class]
+                                                   forKey:NSStringFromSelector(@selector(protocol))];
         
         self.type = [decoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(type))];
         self.scope = [decoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(scope))];
@@ -376,6 +385,7 @@ EndpointType endpointTypeForAddress(NSString* address)
     [encoder encodeObject:self.endpointAddr forKey:NSStringFromSelector(@selector(endpointAddr))];
     [encoder encodeObject:self.endpointHost forKey:NSStringFromSelector(@selector(endpointHost))];
     [encoder encodeObject:self.endpointPort forKey:NSStringFromSelector(@selector(endpointPort))];
+    [encoder encodeObject:self.protocol forKey:NSStringFromSelector(@selector(protocol))];
     //endpoint addr match type
     // note: encoded as an object (not a primitive), so it can be decoded w/o any chance of a
     //       type-mismatch exception (which would abort the decode of *all* rules)
@@ -797,6 +807,49 @@ bail:
             goto bail;
         }
         
+        // Protocol is optional for backward compatibility with legacy exports.
+        // Accept only integral IP protocol values (0 = any). Never coerce
+        // malformed metadata into zero, which would silently widen a rule.
+        id protocolValue = info[NSStringFromSelector(@selector(protocol))];
+        if(nil != protocolValue)
+        {
+            if([protocolValue isKindOfClass:[NSString class]])
+            {
+                NSString *digits = (NSString *)protocolValue;
+                NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+                if(0 == digits.length ||
+                   NSNotFound != [digits rangeOfCharacterFromSet:nonDigits].location)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                unsigned long long parsed = digits.longLongValue;
+                if(parsed > UINT8_MAX)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                self.protocol = @((unsigned int)parsed);
+            }
+            else if([protocolValue isKindOfClass:[NSNumber class]])
+            {
+                NSNumber *number = (NSNumber *)protocolValue;
+                NSInteger numberValue = number.integerValue;
+                if(numberValue < 0 || numberValue > UINT8_MAX ||
+                   number.doubleValue != (double)numberValue)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                self.protocol = number;
+            }
+            else
+            {
+                self = nil;
+                goto bail;
+            }
+        }
+
         //endpoint addr match type {exact, regex, cidr, glob}
         // validate before calling 'integerValue', as a non-number (e.g. NSNull) would throw
         id endpointAddrType = info[NSStringFromSelector(@selector(isEndpointAddrRegex))];
