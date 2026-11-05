@@ -140,6 +140,32 @@ int main(void) {
                   @"/Applications/Blocked.app/*", nil, NO,
                   @"*", @"*", nil),
               "missing action must not silently become a hard block");
+        // Protocol-constrained rules must match the actual socket type,
+        // including sockets created with protocol 0 (system-chosen default).
+        CHECK(JameRuleProtocolMatchesSocket(nil, IPPROTO_TCP, SOCK_STREAM),
+              "legacy rule with no protocol matches TCP");
+        CHECK(JameRuleProtocolMatchesSocket(nil, IPPROTO_UDP, SOCK_DGRAM),
+              "legacy rule with no protocol matches UDP");
+        CHECK(JameRuleProtocolMatchesSocket(@0, IPPROTO_UDP, SOCK_DGRAM),
+              "explicit protocol 0 means all protocols");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_TCP, SOCK_STREAM),
+              "TCP rule matches a TCP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_UDP, SOCK_DGRAM),
+              "TCP rule must not match UDP");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_UDP, SOCK_DGRAM),
+              "UDP rule matches a UDP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_TCP, SOCK_STREAM),
+              "UDP rule must not match TCP");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_STREAM),
+              "TCP rule matches stream socket with implicit protocol");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_IP, SOCK_DGRAM),
+              "UDP rule matches datagram socket with implicit protocol");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_DGRAM),
+              "TCP rule must not match implicit UDP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_RAW),
+              "unknown implicit socket protocol must not match TCP");
+        CHECK(!JameRuleProtocolMatchesSocket(@(-1), IPPROTO_TCP, SOCK_STREAM),
+              "invalid negative protocol is not a wildcard");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionInbound), "inbound connections are processed");
         CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
         CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");
