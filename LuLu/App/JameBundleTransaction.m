@@ -196,8 +196,12 @@ static BOOL JameInstallFail(NSError **error, NSInteger code, NSString *detail)
 
 - (BOOL)rollbackWithError:(NSError **)error
 {
-    if (!_activated)
-        return JameInstallFail(error, 12, @"No activated installation to roll back");
+    // A failed Foundation replacement can move the original item into its
+    // backup location before reporting an error. Recover that partial state
+    // as well as a fully activated replacement.
+    if (!_activated && (!_backupURL ||
+                        ![[NSFileManager defaultManager] fileExistsAtPath:_backupURL.path]))
+        return JameInstallFail(error, 12, @"No backed-up installation to roll back");
     NSFileManager *fm = [NSFileManager defaultManager];
     if ([fm fileExistsAtPath:_destinationURL.path] &&
         ![self isExpectedBundle:_destinationURL])
