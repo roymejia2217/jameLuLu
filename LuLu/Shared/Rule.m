@@ -108,12 +108,6 @@ EndpointType endpointTypeForAddress(NSString* address)
             // nil? default to all ('*')
             self.endpointAddr = (nil != info[KEY_ENDPOINT_ADDR]) ? info[KEY_ENDPOINT_ADDR] : VALUE_ANY;
             
-            // An absent field in older exports means any protocol.
-    if(nil != self.protocol)
-    {
-        [json appendFormat:@"\\\"%@\\\" : %d,", NSStringFromSelector(@selector(protocol)), self.protocol.intValue];
-    }
-
     //endpoint addr match type {exact, regex, cidr}
             self.isEndpointAddrRegex = [info[KEY_ENDPOINT_ADDR_IS_REGEX] integerValue];
             
@@ -599,6 +593,12 @@ bail:
     //port
     [json appendFormat:@"\"%@\" : \"%@\",", NSStringFromSelector(@selector(endpointPort)), self.endpointPort];
     
+    // Omitted in legacy rules: absence means any protocol.
+    if(nil != self.protocol)
+    {
+        [json appendFormat:@"\"%@\" : %d,", NSStringFromSelector(@selector(protocol)), self.protocol.intValue];
+    }
+
     //endpoint addr match type {exact, regex, cidr}
     [json appendFormat:@"\"%@\" : %ld,", NSStringFromSelector(@selector(isEndpointAddrRegex)), (long)self.isEndpointAddrRegex];
 
