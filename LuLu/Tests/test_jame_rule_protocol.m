@@ -43,7 +43,7 @@ static int failures = 0;
     if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++; } \
 } while (0)
 
-static Rule *makeRule(NSNumber *protocol) {
+static Rule *makeRule(id protocol) {
     NSMutableDictionary *info = [@{
         KEY_PATH: @"/Applications/Scoped.app/*",
         KEY_PROCESS_NAME: @"Scoped",
@@ -102,6 +102,26 @@ int main(void) {
                                                  fromData:legacyArchive error:&error];
         CHECK(legacyReloaded != nil && legacyReloaded.protocol == nil,
               "legacy keyed rules without protocol remain compatible");
+
+        // The production Rule.init: constructor receives dictionaries from
+        // ordinary rule creation and XPC. Reject invalid protocol types/ranges
+        // before malformed metadata can reach endpoint matching or persistence.
+        CHECK(makeRule(@(IPPROTO_UDP)).protocol.intValue == IPPROTO_UDP,
+              "direct constructor accepts valid UDP");
+        CHECK(makeRule(@0).protocol.intValue == 0,
+              "direct constructor keeps explicit any protocol");
+        CHECK(makeRule(@(-1)) == nil,
+              "direct constructor rejects negative protocols");
+        CHECK(makeRule(@256) == nil,
+              "direct constructor rejects protocols beyond uint8 range");
+        CHECK(makeRule(@1.5) == nil,
+              "direct constructor rejects fractional protocols");
+        CHECK(makeRule(@"tcp") == nil,
+              "direct constructor rejects protocol name strings");
+        CHECK(makeRule(@"6") == nil,
+              "direct constructor does not retain a string as NSNumber");
+        CHECK(makeRule([NSNull null]) == nil,
+              "direct constructor rejects NSNull before integerValue access");
 
         if(exported != nil) {
             NSMutableDictionary *invalid = [exported mutableCopy];
