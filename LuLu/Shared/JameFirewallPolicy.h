@@ -4,6 +4,7 @@
 
 #import <Foundation/Foundation.h>
 #import <NetworkExtension/NetworkExtension.h>
+#import <Network/Network.h>
 
 // Bundle folders (.app) are directories too: a single rule covers all helpers.
 NS_INLINE NSString *JameRulePathForSelection(NSString *path, BOOL isDirectory)
@@ -54,6 +55,38 @@ NS_INLINE NENetworkRule *JameBidirectionalCatchAllRule(void)
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     NENetworkRule *rule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
                                                          remotePrefix:0
+                                                          localNetwork:nil
+                                                           localPrefix:0
+                                                              protocol:NENetworkRuleProtocolAny
+                                                             direction:JameNetworkRuleDirection()];
+#pragma clang diagnostic pop
+    return rule;
+}
+
+// A nil-remote/nil-local catch-all excludes loopback per NetworkExtension.
+// Register IPv4 and IPv6 loopback explicitly in BOTH directions.
+NS_INLINE NENetworkRule *JameBidirectionalLoopbackRule(BOOL ipv6)
+{
+    NSUInteger prefix = ipv6 ? 128 : 8;
+
+    if (@available(macOS 15.0, *))
+    {
+        nw_endpoint_t remote = nw_endpoint_create_host(ipv6 ? "::1" : "127.0.0.0", "0");
+        return [[NENetworkRule alloc] initWithRemoteNetworkEndpoint:remote
+                                                       remotePrefix:prefix
+                                               localNetworkEndpoint:nil
+                                                        localPrefix:0
+                                                           protocol:NENetworkRuleProtocolAny
+                                                          direction:JameNetworkRuleDirection()];
+    }
+
+    // Preserve support for macOS before 15 without silencing warnings globally.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    NWHostEndpoint *remote = [NWHostEndpoint endpointWithHostname:(ipv6 ? @"::1" : @"127.0.0.0")
+                                                               port:@"0"];
+    NENetworkRule *rule = [[NENetworkRule alloc] initWithRemoteNetwork:remote
+                                                         remotePrefix:prefix
                                                           localNetwork:nil
                                                            localPrefix:0
                                                               protocol:NENetworkRuleProtocolAny
