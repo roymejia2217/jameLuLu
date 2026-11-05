@@ -6,6 +6,7 @@
 #import <OSLog/OSLog.h>
 #import <netinet/in.h>
 #import "../Shared/Rule.h"
+#import "../Shared/JameRulesSnapshot.h"
 #import "../Shared/utilities.h"
 
 os_log_t logHandle = OS_LOG_DEFAULT;
@@ -183,6 +184,79 @@ int main(void) {
               "direct constructor accepts Block action");
         CHECK(makeRuleWithAction(@(RULE_STATE_ALLOW)) != nil,
               "direct constructor accepts Allow action");
+
+        // Reproduces Rules.load's unguarded assignment before valid decoding.
+        // The helper below is the exact loader preparation function called by
+        // production Rules.load; it must never mutate the current snapshot.
+        Rule *activeRule = makeRule(@(IPPROTO_TCP));
+        Rule *incomingRule = makeRule(@(IPPROTO_UDP));
+        NSMutableDictionary *activeSnapshot = [@{
+            @"active": [@{
+                KEY_RULES: [NSMutableArray arrayWithObject:activeRule],
+                KEY_PATHS: [NSMutableSet setWithObject:activeRule.path]
+            } mutableCopy]
+        } mutableCopy];
+        NSDictionary *incomingSnapshot = @{
+            @"incoming": @{
+                KEY_RULES: @[incomingRule],
+                KEY_PATHS: [NSSet setWithObject:incomingRule.path]
+            }
+        };
+        CHECK(JamePreparedRulesSnapshot(nil) == nil,
+              "unarchive failure must never become an empty replacement");
+        CHECK(JamePreparedRulesSnapshot(@"invalid-root") == nil,
+              "non-dictionary archive cannot replace active rules");
+        CHECK(JamePreparedRulesSnapshot(@{@"bad": @"invalid-entry"}) == nil,
+              "malformed per-key container must be rejected");
+        CHECK(JamePreparedRulesSnapshot(@{@"bad": @{KEY_RULES: @"not-an-array"}}) == nil,
+              "malformed rules collection must be rejected");
+        CHECK(JamePreparedRulesSnapshot(@{@"bad": @{KEY_RULES: @[@"not-a-rule"]}}) == nil,
+              "malformed rule element must be rejected");
+        CHECK(JamePreparedRulesSnapshot(@{@"bad": @{KEY_RULES: @[incomingRule],
+                                                  KEY_PATHS: @"not-a-set"}}) == nil,
+              "malformed paths cannot corrupt a loaded snapshot");
+        CHECK(activeSnapshot[@"active"] != nil,
+              "invalid candidate must leave original rules available");
+
+        NSMutableDictionary *prepared = JamePreparedRulesSnapshot(incomingSnapshot);
+        CHECK(prepared != nil && prepared[@"incoming"] != nil,
+              "valid incoming rules are accepted");
+        CHECK([prepared isKindOfClass:[NSMutableDictionary class]],
+              "top-level loaded rules must be mutable for runtime updates");
+        CHECK([prepared[@"incoming"] isKindOfClass:[NSMutableDictionary class]],
+              "loaded per-key rule containers must be mutable");
+        CHECK([prepared[@"incoming"][KEY_RULES] isKindOfClass:[NSMutableArray class]],
+              "loaded rule list must be mutable for add/delete operations");
+        CHECK([prepared[@"incoming"][KEY_PATHS] isKindOfClass:[NSMutableSet class]],
+              "loaded path set must be mutable for additional executables");
+        [prepared[@"incoming"][KEY_RULES] addObject:activeRule];
+        CHECK([incomingSnapshot[@"incoming"][KEY_RULES] count] == 1,
+              "preparing a candidate must not change decoded immutable archive data");
+        CHECK([activeSnapshot[@"active"][KEY_RULES] count] == 1,
+              "preparing a candidate must not change the live snapshot");
+
+        NSDictionary *legacySnapshot = @{
+            @"legacy": @{KEY_RULES: @[activeRule]}
+        };
+        NSMutableDictionary *legacyPrepared = JamePreparedRulesSnapshot(legacySnapshot);
+        CHECK([legacyPrepared[@"legacy"][KEY_PATHS] isKindOfClass:[NSMutableSet class]],
+              "legacy non-directory rules without paths must gain mutable paths");
+
+        NSError *snapshotError = nil;
+        NSData *encodedSnapshot = [NSKeyedArchiver archivedDataWithRootObject:incomingSnapshot
+                                                        requiringSecureCoding:YES
+                                                                        error:&snapshotError];
+        NSSet *archiveClasses = [NSSet setWithArray:@[
+            [NSDictionary class], [NSArray class], [NSString class],
+            [NSNumber class], [NSSet class], [Rule class]
+        ]];
+        id decodedSnapshot = encodedSnapshot == nil ? nil
+            : [NSKeyedUnarchiver unarchivedObjectOfClasses:archiveClasses
+                                                   fromData:encodedSnapshot error:&snapshotError];
+        CHECK(encodedSnapshot != nil && decodedSnapshot != nil && snapshotError == nil,
+              "valid production rule snapshot can round-trip through NSSecureCoding");
+        CHECK(JamePreparedRulesSnapshot(decodedSnapshot)[@"incoming"] != nil,
+              "valid real archive remains eligible for atomic replacement");
 
         if(exported != nil) {
             NSMutableDictionary *invalid = [exported mutableCopy];
