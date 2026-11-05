@@ -1,0 +1,22 @@
+name: Validate GitHub Actions workflows
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check workflow syntax and embedded shell commands
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            --workdir /repo \
+            rhysd/actionlint:1.7.12 -color

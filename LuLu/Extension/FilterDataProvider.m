@@ -10,6 +10,7 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
+#import "../Shared/JameFirewallPolicy.h"
 #import "GrayList.h"
 #import "BlockOrAllowList.h"
 #import "utilities.h"
@@ -97,7 +98,7 @@ extern BlockOrAllowList* blockList;
     NSMutableArray<NEFilterRule*>* rules = nil;
 
     //network rules
-    NENetworkRule* anyOutboundRule = nil;
+    NENetworkRule* anyDirectionRule = nil;
     NENetworkRule* loopbackRule4 = nil;
     NENetworkRule* loopbackRule6 = nil;
 
@@ -110,37 +111,18 @@ extern BlockOrAllowList* blockList;
     //init rules array
     rules = [NSMutableArray array];
 
-    //Rule 1:
-    // IPv4 loopback (127.0.0.0/8), any port
-    NWHostEndpoint* loopback4 = [NWHostEndpoint endpointWithHostname:@"127.0.0.0" port:@"0"];
-    loopbackRule4 = [[NENetworkRule alloc] initWithRemoteNetwork:loopback4
-                                                   remotePrefix:8
-                                                    localNetwork:nil
-                                                     localPrefix:0
-                                                        protocol:NENetworkRuleProtocolAny
-                                                       direction:NETrafficDirectionOutbound];
+    //Rule 1: IPv4 loopback 127.0.0.0/8, both directions, any port.
+    loopbackRule4 = JameBidirectionalLoopbackRule(NO);
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:loopbackRule4 action:NEFilterActionFilterData]];
 
-    //Rule 2:
-    // IPv6 loopback (::1/128), any port
-    NWHostEndpoint* loopback6 = [NWHostEndpoint endpointWithHostname:@"::1" port:@"0"];
-    loopbackRule6 = [[NENetworkRule alloc] initWithRemoteNetwork:loopback6
-                                                   remotePrefix:128
-                                                    localNetwork:nil
-                                                     localPrefix:0
-                                                        protocol:NENetworkRuleProtocolAny
-                                                       direction:NETrafficDirectionOutbound];
+    //Rule 2: IPv6 loopback ::1/128, both directions, any port.
+    loopbackRule6 = JameBidirectionalLoopbackRule(YES);
     [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:loopbackRule6 action:NEFilterActionFilterData]];
 
     //Rule 3:
-    // any/all outbound traffic (non-loopback)
-    anyOutboundRule = [[NENetworkRule alloc] initWithRemoteNetwork:nil
-                                                     remotePrefix:0
-                                                      localNetwork:nil
-                                                       localPrefix:0
-                                                          protocol:NENetworkRuleProtocolAny
-                                                         direction:NETrafficDirectionOutbound];
-    [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:anyOutboundRule action:NEFilterActionFilterData]];
+    // all inbound and outbound traffic (loopback included)
+    anyDirectionRule = JameBidirectionalCatchAllRule();
+    [rules addObject:[[NEFilterRule alloc] initWithNetworkRule:anyDirectionRule action:NEFilterActionFilterData]];
 
     //init filter settings
     filterSettings = [[NEFilterSettings alloc] initWithRules:rules defaultAction:NEFilterActionAllow];
@@ -246,12 +228,12 @@ extern BlockOrAllowList* blockList;
     //log msg
     os_log_debug(logHandle, "remote endpoint: %{public}@ / url: %{public}@", remoteEndpoint, flow.URL);
     
-    //ignore non-outbound traffic
-    // even though we init'd `NETrafficDirectionOutbound`, sometimes get inbound traffic :|
-    if(NETrafficDirectionOutbound != socketFlow.direction)
+    //ignore only unsupported traffic directions
+    // both inbound and outbound flows are processed by the same saved rules
+    if(YES != JameFlowDirectionIsSupported(socketFlow.direction))
     {
         //log msg
-        os_log_debug(logHandle, "ignoring non-outbound traffic (direction: %ld)", (long)socketFlow.direction);
+        os_log_debug(logHandle, "ignoring unsupported traffic direction: %ld", (long)socketFlow.direction);
            
         //bail
         goto bail;
@@ -393,7 +375,7 @@ bail:
 
     //extract pid
     // note: 'audit_token_to_pid' is just a field accessor (can't fail), so only call it on a well-formed token
-    if(sizeof(audit_token_t) == flow.sourceAppAuditToken.length)
+    if(JameHasValidAuditToken(flow.sourceAppAuditToken))
     {
         //extract
         pid = audit_token_to_pid(*(audit_token_t*)flow.sourceAppAuditToken.bytes);
@@ -482,6 +464,14 @@ bail:
         goto bail;
     }
         
+    // jameLuLu: a deliberate "block entire directory" rule is a hard deny.
+    // Evaluate it before global allow lists, localhost shortcuts, and per-app rules.
+    if(nil != [rules findUnconditionalDirectoryBlock:process])
+    {
+        os_log(logHandle, "blocked by unconditional directory isolation: %{public}@", process.path);
+        verdict = kFlowVerdictBlock;
+        goto bail;
+    }
     //CHECK:
     // different logged in user?
     // just allow flow, as we don't want to block their traffic
@@ -1039,7 +1029,7 @@ bail:
     
     //log msg
     // match on this if you want detailed insight into LuLu's decision
-    // log stream --level debug --predicate 'subsystem == "com.objective-see.lulu" && composedMessage BEGINSWITH "[LULU]"'
+    // log stream --level debug --predicate 'subsystem == "io.github.roymejia2217.jamelulu" && composedMessage BEGINSWITH "[LULU]"'
     os_log_debug(logHandle, "[LULU] PROCESS: %{public}@, FLOW (endpoint): %{public}@, RULE: %{public}@, verdict: %ld", process.path, ((NEFilterSocketFlow*)flow).remoteEndpoint, matchingRule, verdict);
 
     //blocked?
@@ -1333,8 +1323,12 @@ bail:
             // note: iterating a copy, so safe to remove from the queue in the loop
             for(NEFilterSocketFlow* flow in [self.relatedFlows[key] array])
             {
-                //pid via the flow's (kernel) audit token
-                pid_t pid = audit_token_to_pid(*(audit_token_t*)flow.sourceAppAuditToken.bytes);
+                // The audit token is optional. A malformed held flow cannot
+                // be attributed safely and must be reaped, not dereferenced.
+                NSData* sourceAudit = flow.sourceAppAuditToken;
+                pid_t pid = JameHasValidAuditToken(sourceAudit)
+                    ? audit_token_to_pid(*(audit_token_t*)sourceAudit.bytes)
+                    : 0;
 
                 //process still alive?
                 // leave its flow be (still awaiting a verdict)
@@ -1410,7 +1404,8 @@ bail:
 
     //none, or same as the app's?
     // not delegated, so the socket is the app's own ...rules apply as normal
-    if( (nil == token) ||
+    if( (YES != JameHasValidAuditToken(token)) ||
+        (YES != JameHasValidAuditToken(flow.sourceAppAuditToken)) ||
         (YES == [token isEqualToData:flow.sourceAppAuditToken]) )
     {
         //bail
@@ -1442,7 +1437,8 @@ bail:
 
     //none, or same as the app's?
     // not a delegated flow
-    if( (nil == token) ||
+    if( (YES != JameHasValidAuditToken(token)) ||
+        (YES != JameHasValidAuditToken(flow.sourceAppAuditToken)) ||
         (YES == [token isEqualToData:flow.sourceAppAuditToken]) )
     {
         //bail
@@ -1473,6 +1469,14 @@ bail:
     Process* process = nil;
     
     //extract (audit) token
+    // The token is optional in Apple's API. A missing/truncated token must
+    // never reach Process init or the BSM audit_token_to_pid accessor.
+    if(YES != JameHasValidAuditToken(flow.sourceAppAuditToken))
+    {
+        os_log_error(logHandle, "ERROR: cannot create process from malformed source audit token");
+        goto bail;
+    }
+
     token = (audit_token_t*)flow.sourceAppAuditToken.bytes;
     
     //init process object, via audit token

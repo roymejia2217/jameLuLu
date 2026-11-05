@@ -147,6 +147,15 @@ enum menuItems
     // add target, enable, and handler for each
     for(NSMenuItem* menuItem in menu.itemArray)
     {
+        // The upstream Netiquette binary is not part of the reproducible fork build.
+        // Hide the unsupported action instead of presenting a broken menu entry.
+        if(monitor == menuItem.tag)
+        {
+            menuItem.hidden = YES;
+            menuItem.enabled = NO;
+            menuItem.action = nil;
+            continue;
+        }
         //handle sub-menu(s)
         if(nil != menuItem.submenu)
         {
@@ -384,33 +393,6 @@ enum menuItems
         case prefs:
             [((AppDelegate*)[[NSApplication sharedApplication] delegate]) showPreferences:TOOLBAR_RULES_ID];
             break;
-            
-        //monitor
-        // launch netiquette (with lulu args)
-        case monitor:
-        {
-            //path
-            NSURL* path = nil;
-           
-            //error
-            NSError* error = nil;
-           
-            //init path
-            path = [NSURL fileURLWithPath:[NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:NETWORK_MONITOR]];
-            
-            //dbg msg
-            os_log_debug(logHandle, "launching network monitor (%{public}@)", path);
-            
-            //launch
-            // with args
-            if(nil == [NSWorkspace.sharedWorkspace launchApplicationAtURL:path options:0 configuration:[NSDictionary dictionaryWithObject:@[@"-lulu"] forKey:NSWorkspaceLaunchConfigurationArguments] error:&error])
-            {
-                //err msg
-                os_log_error(logHandle, "ERROR: failed to launch network monitor, %{public}@, (error: %{public}@)", path, error);
-            }
-            
-            break;
-        }
             
         //quit
         case quit:

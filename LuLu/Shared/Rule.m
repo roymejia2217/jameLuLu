@@ -38,6 +38,39 @@ EndpointType endpointTypeForAddress(NSString* address)
     return EndpointTypeExact;
 }
 
+// Reject malformed protocol metadata at the rule-construction boundary.
+// IP protocol numbers are unsigned 8-bit values. Do not coerce NSString,
+// NSNull, negative or fractional values into an unrestricted rule.
+static BOOL JameValidProtocolNumber(id value)
+{
+    if(YES != [value isKindOfClass:[NSNumber class]]) return NO;
+
+    NSNumber *number = (NSNumber *)value;
+    NSInteger protocolValue = number.integerValue;
+    return protocolValue >= 0 && protocolValue <= UINT8_MAX &&
+           number.doubleValue == (double)protocolValue;
+}
+
+// Importers and direct callers must never coerce unknown actions into 0,
+// which means Block. Legacy JSON may represent only "0" and "1" as strings.
+static NSNumber *JameNormalizedRuleAction(id value)
+{
+    if([value isKindOfClass:[NSString class]])
+    {
+        if([value isEqualToString:@"0"]) return @(RULE_STATE_BLOCK);
+        if([value isEqualToString:@"1"]) return @(RULE_STATE_ALLOW);
+        return nil;
+    }
+    if(YES != [value isKindOfClass:[NSNumber class]]) return nil;
+
+    NSNumber *number = (NSNumber *)value;
+    NSInteger actionValue = number.integerValue;
+    if((RULE_STATE_BLOCK != actionValue && RULE_STATE_ALLOW != actionValue) ||
+       number.doubleValue != (double)actionValue)
+        return nil;
+    return number;
+}
+
 @implementation Rule
 
 @synthesize scope;
@@ -108,7 +141,7 @@ EndpointType endpointTypeForAddress(NSString* address)
             // nil? default to all ('*')
             self.endpointAddr = (nil != info[KEY_ENDPOINT_ADDR]) ? info[KEY_ENDPOINT_ADDR] : VALUE_ANY;
             
-            //endpoint addr match type {exact, regex, cidr}
+    //endpoint addr match type {exact, regex, cidr}
             self.isEndpointAddrRegex = [info[KEY_ENDPOINT_ADDR_IS_REGEX] integerValue];
             
             //init port
@@ -137,14 +170,28 @@ EndpointType endpointTypeForAddress(NSString* address)
             self.endpointHost = remoteURL.host;
         }
         
-        //set proto
-        self.protocol = info[KEY_PROTOCOL];
+        // Optional for legacy rules, but a supplied value must be a valid
+        // numeric protocol before it can reach the flow matcher or archives.
+        id protocolValue = info[KEY_PROTOCOL];
+        if(nil != protocolValue && YES != JameValidProtocolNumber(protocolValue))
+        {
+            os_log_error(logHandle, "ERROR: invalid rule protocol type or value: %{public}@", [protocolValue class]);
+            self = nil;
+            return self;
+        }
+        self.protocol = protocolValue;
     
         //set type
         self.type = info[KEY_TYPE];
         
-        //init action
-        self.action = info[KEY_ACTION];
+        // An explicit valid decision is mandatory: never interpret nil or
+        // unrecognized text as Block when creating rules via XPC/UI.
+        self.action = JameNormalizedRuleAction(info[KEY_ACTION]);
+        if(nil == self.action)
+        {
+            os_log_error(logHandle, "ERROR: invalid or missing rule action");
+            return nil;
+        }
         
         //now, generate key
         if(nil != info[KEY_KEY])
@@ -346,6 +393,9 @@ EndpointType endpointTypeForAddress(NSString* address)
         self.isEndpointAddrRegex = (nil != endpointAddrType) ? endpointAddrType.integerValue : endpointTypeForAddress(self.endpointAddr);
         self.endpointHost = [decoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(endpointHost))];
         self.endpointPort = [decoder decodeObjectOfClass:[NSString class] forKey:NSStringFromSelector(@selector(endpointPort))];
+        // Optional in legacy archives; nil continues to match every protocol.
+        self.protocol = [decoder decodeObjectOfClass:[NSNumber class]
+                                                   forKey:NSStringFromSelector(@selector(protocol))];
         
         self.type = [decoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(type))];
         self.scope = [decoder decodeObjectOfClass:[NSNumber class] forKey:NSStringFromSelector(@selector(scope))];
@@ -355,6 +405,15 @@ EndpointType endpointTypeForAddress(NSString* address)
         
         self.creation = [decoder decodeObjectOfClass:[NSDate class] forKey:NSStringFromSelector(@selector(creation))];
         self.expiration = [decoder decodeObjectOfClass:[NSDate class] forKey:NSStringFromSelector(@selector(expiration))];
+        // A missing action decodes to nil (and integerValue would become
+        // RULE_STATE_BLOCK). Never allow malformed persisted rules to
+        // re-enter policy evaluation; protocol remains optional for legacy.
+        if(nil == JameNormalizedRuleAction(self.action) ||
+           (nil != self.protocol && YES != JameValidProtocolNumber(self.protocol)))
+        {
+            os_log_error(logHandle, "ERROR: invalid archived rule action or protocol");
+            return nil;
+        }
     }
     
     return self;
@@ -376,6 +435,7 @@ EndpointType endpointTypeForAddress(NSString* address)
     [encoder encodeObject:self.endpointAddr forKey:NSStringFromSelector(@selector(endpointAddr))];
     [encoder encodeObject:self.endpointHost forKey:NSStringFromSelector(@selector(endpointHost))];
     [encoder encodeObject:self.endpointPort forKey:NSStringFromSelector(@selector(endpointPort))];
+    [encoder encodeObject:self.protocol forKey:NSStringFromSelector(@selector(protocol))];
     //endpoint addr match type
     // note: encoded as an object (not a primitive), so it can be decoded w/o any chance of a
     //       type-mismatch exception (which would abort the decode of *all* rules)
@@ -401,17 +461,17 @@ EndpointType endpointTypeForAddress(NSString* address)
     BOOL matches = NO;
     
     //rule action (as string)
-    NSString* action = nil;
+    NSString* actionText = nil;
     
     //init w/ allow
     if(RULE_STATE_ALLOW == self.action.integerValue)
     {
-        action = NSLocalizedString(@"Allow", "@Allow");
+        actionText = NSLocalizedString(@"Allow", "@Allow");
     }
     //init w/ block
     else if(RULE_STATE_BLOCK == self.action.integerValue)
     {
-        action = NSLocalizedString(@"Block", @"Block");
+        actionText = NSLocalizedString(@"Block", @"Block");
     }
     
     //check name, path
@@ -469,8 +529,8 @@ EndpointType endpointTypeForAddress(NSString* address)
     }
     
     //check state
-    if( (nil != action) &&
-        (YES == [action localizedCaseInsensitiveContainsString:match]) )
+    if( (nil != actionText) &&
+        (YES == [actionText localizedCaseInsensitiveContainsString:match]) )
     {
         //match
         matches = YES;
@@ -589,6 +649,12 @@ bail:
     //port
     [json appendFormat:@"\"%@\" : \"%@\",", NSStringFromSelector(@selector(endpointPort)), self.endpointPort];
     
+    // Omitted in legacy rules: absence means any protocol.
+    if(nil != self.protocol)
+    {
+        [json appendFormat:@"\"%@\" : %d,", NSStringFromSelector(@selector(protocol)), self.protocol.intValue];
+    }
+
     //endpoint addr match type {exact, regex, cidr}
     [json appendFormat:@"\"%@\" : %ld,", NSStringFromSelector(@selector(isEndpointAddrRegex)), (long)self.isEndpointAddrRegex];
 
@@ -797,6 +863,49 @@ bail:
             goto bail;
         }
         
+        // Protocol is optional for backward compatibility with legacy exports.
+        // Accept only integral IP protocol values (0 = any). Never coerce
+        // malformed metadata into zero, which would silently widen a rule.
+        id protocolValue = info[NSStringFromSelector(@selector(protocol))];
+        if(nil != protocolValue)
+        {
+            if([protocolValue isKindOfClass:[NSString class]])
+            {
+                NSString *digits = (NSString *)protocolValue;
+                NSCharacterSet *nonDigits = [[NSCharacterSet characterSetWithCharactersInString:@"0123456789"] invertedSet];
+                if(0 == digits.length ||
+                   NSNotFound != [digits rangeOfCharacterFromSet:nonDigits].location)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                unsigned long long parsed = digits.longLongValue;
+                if(parsed > UINT8_MAX)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                self.protocol = @((unsigned int)parsed);
+            }
+            else if([protocolValue isKindOfClass:[NSNumber class]])
+            {
+                NSNumber *number = (NSNumber *)protocolValue;
+                NSInteger numberValue = number.integerValue;
+                if(numberValue < 0 || numberValue > UINT8_MAX ||
+                   number.doubleValue != (double)numberValue)
+                {
+                    self = nil;
+                    goto bail;
+                }
+                self.protocol = number;
+            }
+            else
+            {
+                self = nil;
+                goto bail;
+            }
+        }
+
         //endpoint addr match type {exact, regex, cidr, glob}
         // validate before calling 'integerValue', as a non-number (e.g. NSNull) would throw
         id endpointAddrType = info[NSStringFromSelector(@selector(isEndpointAddrRegex))];
@@ -840,16 +949,10 @@ bail:
             goto bail;
         }
         
-        self.action = info[NSStringFromSelector(@selector(action))];
-        if([self.action isKindOfClass:[NSString class]]) {
-            self.action = @([(NSString*)self.action integerValue]);
-        }
-        
-        if(YES != [self.action isKindOfClass:[NSNumber class]])
+        self.action = JameNormalizedRuleAction(info[NSStringFromSelector(@selector(action))]);
+        if(nil == self.action)
         {
-            //err msg
-            os_log_error(logHandle, "ERROR: 'action' should be a number, not %@", [self.action class]);
-            
+            os_log_error(logHandle, "ERROR: JSON rule action must be Block (0) or Allow (1)");
             self = nil;
             goto bail;
         }

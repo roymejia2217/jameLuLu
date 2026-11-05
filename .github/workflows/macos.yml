@@ -1,0 +1,128 @@
+name: macOS build and firewall policy tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  policy-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compile and run production policy tests
+        run: |
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation -framework NetworkExtension \
+            LuLu/Tests/test_jame_firewall_policy.m -o "$RUNNER_TEMP/jame-policy-tests"
+          "$RUNNER_TEMP/jame-policy-tests"
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation -framework Security \
+            LuLu/Tests/test_jame_identity_policy.m -o "$RUNNER_TEMP/jame-identity-tests"
+          "$RUNNER_TEMP/jame-identity-tests"
+      - name: Compile and exercise production Rule persistence
+        run: |
+          clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+            -framework Foundation -framework AppKit \
+            LuLu/Tests/test_jame_rule_protocol.m LuLu/Shared/Rule.m \
+            -o "$RUNNER_TEMP/jame-rule-protocol-tests"
+          "$RUNNER_TEMP/jame-rule-protocol-tests"
+      - name: Validate real socket probe fixtures (no content filter active)
+        env:
+          JAME_PROBE_EXPECT: allow
+        run: |
+          python3 LuLu/Tests/test_socket_probe.py -v
+      - name: Verify blocked-mode rejects unfiltered traffic (negative control)
+        env:
+          JAME_PROBE_EXPECT: block
+        run: |
+          # No content filter is active in GitHub's unsigned macOS build.
+          # An attempt to assert blocked traffic MUST fail in all 8 protected cases.
+          mkdir -p "$RUNNER_TEMP/jamelulu-protected-root"
+          export JAME_PROBE_BLOCK_ROOT="$RUNNER_TEMP/jamelulu-protected-root"
+          set +e
+          python3 LuLu/Tests/test_socket_probe.py -v > "$RUNNER_TEMP/socket-negative-control.log" 2>&1
+          result=$?
+          set -e
+          if [ "$result" -eq 0 ] ||
+             ! grep -Fq 'FAILED (failures=8)' "$RUNNER_TEMP/socket-negative-control.log"; then
+            cat "$RUNNER_TEMP/socket-negative-control.log"
+            echo "ERROR: unfiltered connections were not rejected by the blocked-mode test"
+            exit 1
+          fi
+          actual="$(grep -c '^AssertionError:.*FILTER BYPASS:' "$RUNNER_TEMP/socket-negative-control.log")"
+          if [ "$actual" -ne 8 ]; then
+            cat "$RUNNER_TEMP/socket-negative-control.log"
+            echo "ERROR: expected 8 detected bypasses, got $actual"
+            exit 1
+          fi
+          echo "PASS: blocked-mode correctly rejects an unfiltered runner (8 bypasses)."
+
+  unsigned-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate Xcode project, schemes and entitlements
+        run: |
+          plutil -lint LuLu/LuLu.xcodeproj/project.pbxproj
+          if grep -Fq 'findProcesses(@"LuLu")' LuLu/App/Configure.m; then
+            echo "ERROR: generic LuLu process termination would affect the upstream application"
+            exit 1
+          fi
+          if grep -Eq 'PROVISIONING_PROFILE_SPECIFIER.*LuLu (Application|Extension)' LuLu/LuLu.xcodeproj/project.pbxproj; then
+            echo "ERROR: inherited upstream provisioning profile remains"
+            exit 1
+          fi
+          plutil -lint LuLu/App/Info.plist LuLu/Extension/Info.plist
+          plutil -lint LuLu/App/App.entitlements LuLu/Extension/Extension.entitlements
+          xcodebuild -list -workspace lulu.xcworkspace
+          bash -n DMG/createDMG.sh
+          if env -u JAMELULU_DEVELOPER_ID -u JAMELULU_TEAM_ID -u JAMELULU_NOTARY_PROFILE bash DMG/createDMG.sh > "$RUNNER_TEMP/packaging-denial.txt" 2>&1; then
+            echo "ERROR: release packaging did not reject missing credentials"
+            exit 1
+          fi
+          grep -q JAMELULU_DEVELOPER_ID "$RUNNER_TEMP/packaging-denial.txt"
+      - name: Compile application and system extension (unsigned)
+        run: |
+          xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
+            -configuration Release -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Analyze app and system extension with Xcode
+        run: |
+          xcodebuild -workspace lulu.xcworkspace -scheme LuLu \
+            -configuration Release -derivedDataPath "$RUNNER_TEMP/jamelulu-build" \
+            CODE_SIGNING_ALLOWED=NO analyze
+      - name: Verify unsigned app bundle and embedded system extension
+        run: |
+          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Release/jameLuLu.app"
+          EXT="$APP/Contents/Library/SystemExtensions/io.github.roymejia2217.jamelulu.extension.systemextension"
+          test -d "$APP" && test -d "$EXT"
+          test -x "$APP/Contents/MacOS/jameLuLu"
+          APP_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Contents/Info.plist")
+          EXT_ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$EXT/Contents/Info.plist")
+          test "$APP_ID" = io.github.roymejia2217.jamelulu.app
+          test "$EXT_ID" = io.github.roymejia2217.jamelulu.extension
+          echo "Unsigned bundle layout verified; this does not test Network Extension activation."
+      - name: Produce inspection-only debug archive
+        run: |
+          APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Release/jameLuLu.app"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
+          shasum -a 256 "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: jameLuLu-UNSIGNED-Release-${{ matrix.runner }}
+          path: ${{ runner.temp }}/jameLuLu-UNSIGNED-Release.zip
+          retention-days: 7

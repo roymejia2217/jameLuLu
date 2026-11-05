@@ -11,6 +11,8 @@
 #import "Rules.h"
 #import "Alerts.h"
 #import "consts.h"
+#import "../Shared/JameFirewallPolicy.h"
+#import "../Shared/JameRulesSnapshot.h"
 #import "Process.h"
 #import "utilities.h"
 #import "Preferences.h"
@@ -346,43 +348,21 @@ bail:
     @synchronized(self)
     {
 
-    //unarchive
-    self.rules = [self unarchiveRulesData:archivedRules];
-    if(nil == self.rules)
+    // Stage a decoded, mutable snapshot without modifying live rules.
+    // A failed decode/validation must not erase the previous profile or
+    // remove an existing app block.
+    id decodedRules = [self unarchiveRulesData:archivedRules];
+    NSMutableDictionary *preparedRules = JamePreparedRulesSnapshot(decodedRules);
+    if(nil == preparedRules)
     {
-        //err msg
-        os_log_error(logHandle, "ERROR: failed to unarchive rules from %{public}@", RULES_FILE);
-
-        //bail
+        os_log_error(logHandle, "ERROR: rejected invalid rules archive from %{public}@", rulesFile);
         goto bail;
     }
-    
-    //make sure all item rules have a set for 'external' paths
-    // older rules didn't use this, so let's make do it here manually
-    for(NSString* key in self.rules)
-    {
-        //skip global rules
-        if(YES == [key isEqualToString:VALUE_ANY])
-        {
-            continue;
-        }
-        
-        //skip directory rules
-        // grab first/any rule and check
-        if(YES == ((Rule*)[self.rules[key][KEY_RULES] firstObject]).isDirectory.boolValue)
-        {
-            continue;
-        }
-        
-        //paths set nil?
-        // alloc for paths
-        if(nil == self.rules[key][KEY_PATHS])
-        {
-            //alloc
-            self.rules[key][KEY_PATHS] = [NSMutableSet set];
-        }
-    }
-    
+
+    // Commit only after the complete candidate has been validated, under
+    // the existing lock used by concurrent rule lookups and profile reloads.
+    self.rules = preparedRules;
+
     //init list for expired rules
     expiredRules = [NSMutableArray array];
 
@@ -714,6 +694,39 @@ bail:
     return;
 }
 
+// For a user-selected directory isolation rule, deny all endpoints before
+// earlier per-app allow rules or global allow lists can override it.
+-(Rule*)findUnconditionalDirectoryBlock:(Process*)process
+{
+    if(0 == process.path.length) return nil;
+
+    @synchronized(self)
+    {
+        for(NSString* key in self.rules)
+        {
+            for(Rule* candidate in self.rules[key][KEY_RULES])
+            {
+                // A hard deny is eligible only when the rule blocks every
+                // protocol, host and port. Scoped rules retain normal matching.
+                if(YES != JameIsUnconditionalDirectoryBlockForPath(
+                    process.path, candidate.path, candidate.action,
+                    candidate.isDisabled.boolValue, candidate.endpointAddr,
+                    candidate.endpointPort, candidate.protocol))
+                    continue;
+
+                if(nil != candidate.expiration &&
+                   NSOrderedDescending == [[NSDate date] compare:candidate.expiration])
+                    continue;
+
+                if(nil != candidate.pid && candidate.pid.intValue != process.pid)
+                    continue;
+
+                return candidate;
+            }
+        }
+    }
+    return nil;
+}
 //find (matching) rule
 -(Rule*)find:(Process*)process flow:(NEFilterSocketFlow*)flow
 {
@@ -775,19 +788,14 @@ bail:
         // i.e. any rule that's '/<anything>*'
         for(NSString* key in self.rules)
         {
-            //directory
-            NSString* directory = nil;
             
             //directory rule?
             // grab first/any rule and check
             if(YES == ((Rule*)[self.rules[key][KEY_RULES] firstObject]).isDirectory.boolValue)
             {
-                //init directory
-                // ...by removing *
-                directory = [key substringToIndex:(key.length-1)];
                 
                 //does item fall within dir?
-                if(YES == [process.path hasPrefix:directory])
+                if(JamePathMatchesDirectoryRule(process.path, key))
                 {
                     //add
                     [directoryRules addObjectsFromArray:self.rules[key][KEY_RULES]];
@@ -879,6 +887,12 @@ bail:
             // note: * is a wildcard, meaning any match
             for(Rule* rule in rules)
             {
+                // Respect protocol-specific imported/archived rules before
+                // evaluating endpoint matches. Legacy nil/0 remains any.
+                if(YES != JameRuleProtocolMatchesSocket(
+                    rule.protocol, flow.socketProtocol, flow.socketType))
+                    continue;
+
                 //set flag: any port ('*')
                 portAny = [rule.endpointPort isEqualToString:VALUE_ANY];
                 

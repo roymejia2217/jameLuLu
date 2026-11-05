@@ -1,0 +1,200 @@
+#import <Foundation/Foundation.h>
+#import "../Shared/JameFirewallPolicy.h"
+
+static int failures = 0;
+
+#define CHECK(condition, message) do { \
+    if (!(condition)) { fprintf(stderr, "FAIL: %s\n", message); failures++; } \
+} while (0)
+
+int main(void) {
+    @autoreleasepool {
+        NSString *app = @"/Applications/Adobe Photoshop.app";
+        NSString *folder = @"/opt/Adobe/Tools";
+        CHECK([JameRulePathForSelection(app, YES) isEqualToString:@"/Applications/Adobe Photoshop.app/*"],
+              "selecting a .app recursively covers all bundled executables");
+        CHECK([JameRulePathForSelection(folder, YES) isEqualToString:@"/opt/Adobe/Tools/*"],
+              "selecting a folder recursively covers its contents");
+        CHECK([JameRulePathForSelection(@"/opt/Adobe/Tools/", YES) isEqualToString:@"/opt/Adobe/Tools/*"],
+              "a trailing slash does not create an invalid rule");
+        CHECK([JameRulePathForSelection(@"/usr/bin/curl", NO) isEqualToString:@"/usr/bin/curl"],
+              "selecting a binary leaves the exact executable path unchanged");
+
+        NSString *rule = @"/Applications/Adobe Photoshop.app/*";
+        CHECK(JamePathMatchesDirectoryRule(@"/Applications/Adobe Photoshop.app/Contents/MacOS/Photoshop", rule),
+              "directory rule covers the main executable");
+        CHECK(JamePathMatchesDirectoryRule(@"/Applications/Adobe Photoshop.app/Contents/Frameworks/Helper.app/Contents/MacOS/Helper", rule),
+              "directory rule covers nested helpers");
+        CHECK(!JamePathMatchesDirectoryRule(@"/Applications/Adobe Photoshop.app.bak/Contents/MacOS/Photoshop", rule),
+              "directory boundary prevents neighboring bundle matches");
+        CHECK(!JamePathMatchesDirectoryRule(@"/Applications/Adobe Photoshop.app", rule),
+              "directory rules target contents, not the directory path itself");
+        CHECK(!JamePathMatchesDirectoryRule(
+                  @"/Applications/Adobe Photoshop.app/../Unrelated.app/Contents/MacOS/Unrelated", rule),
+              "parent-directory traversal must not block an unrelated executable");
+        CHECK(!JamePathMatchesDirectoryRule(
+                  @"/Applications/Adobe Photoshop.app/Contents/../../Other.app/Contents/MacOS/Other", rule),
+              "nested traversal must not escape the selected app bundle");
+        CHECK(JamePathMatchesDirectoryRule(@"/usr/bin/curl", @"/*"),
+              "intentional root-directory rule covers nested executables");
+        // Test with actual filesystem symlinks, not only synthetic string paths.
+        NSFileManager *fs = [NSFileManager defaultManager];
+        NSString *sandbox = [NSTemporaryDirectory() stringByAppendingPathComponent:
+                             [@"jamelulu-path-policy-" stringByAppendingString:[[NSUUID UUID] UUIDString]]];
+        NSString *bundle = [sandbox stringByAppendingPathComponent:@"Protected.app"];
+        NSString *external = [sandbox stringByAppendingPathComponent:@"External"];
+        NSString *bundleContents = [bundle stringByAppendingPathComponent:@"Contents"];
+        NSString *unrelatedBinary = [external stringByAppendingPathComponent:@"Unrelated"];
+        NSString *bundleRule = [bundle stringByAppendingPathComponent:@"*"];
+        CHECK([fs createDirectoryAtPath:bundle withIntermediateDirectories:YES attributes:nil error:NULL],
+              "create protected test bundle");
+        CHECK([fs createDirectoryAtPath:external withIntermediateDirectories:YES attributes:nil error:NULL],
+              "create unrelated test directory");
+        CHECK([fs createFileAtPath:unrelatedBinary contents:[NSData data] attributes:nil],
+              "create unrelated executable path");
+        CHECK([fs createSymbolicLinkAtPath:bundleContents withDestinationPath:external error:NULL],
+              "create symlink inside bundle pointing outside");
+        CHECK(!JamePathMatchesDirectoryRule(
+                  [bundleContents stringByAppendingPathComponent:@"Unrelated"], bundleRule),
+              "a symlink escaping a selected bundle must not block unrelated executables");
+
+        NSString *nested = [sandbox stringByAppendingPathComponent:@"Contained.app/Contents/MacOS"];
+        NSString *containedBinary = [nested stringByAppendingPathComponent:@"Contained"];
+        NSString *alias = [sandbox stringByAppendingPathComponent:@"Alias.app"];
+        CHECK([fs createDirectoryAtPath:nested withIntermediateDirectories:YES attributes:nil error:NULL],
+              "create contained executable directory");
+        CHECK([fs createFileAtPath:containedBinary contents:[NSData data] attributes:nil],
+              "create contained executable path");
+        CHECK([fs createSymbolicLinkAtPath:alias
+                      withDestinationPath:[sandbox stringByAppendingPathComponent:@"Contained.app"] error:NULL],
+              "create alternate path to selected bundle");
+        CHECK(JamePathMatchesDirectoryRule(
+                  [alias stringByAppendingPathComponent:@"Contents/MacOS/Contained"],
+                  [[sandbox stringByAppendingPathComponent:@"Contained.app"] stringByAppendingPathComponent:@"*"]),
+              "an alias resolving inside the selected bundle must be blocked");
+        CHECK([fs removeItemAtPath:sandbox error:NULL], "clean temporary symlink test files");
+        // A delegated system service may supply an optional or malformed
+        // sourceProcessAuditToken. Do not dereference its bytes unless the
+        // complete kernel audit_token_t is present (or crash the provider).
+        uint8_t auditBytes[sizeof(audit_token_t)] = {0};
+        NSData *completeAudit = [NSData dataWithBytes:auditBytes length:sizeof(auditBytes)];
+        NSData *shortAudit = [NSData dataWithBytes:auditBytes length:sizeof(auditBytes) - 1];
+        NSMutableData *longAudit = [completeAudit mutableCopy];
+        [longAudit increaseLengthBy:1];
+        CHECK(!JameHasValidAuditToken(nil), "nil delegated token is invalid");
+        CHECK(!JameHasValidAuditToken([NSData data]), "empty delegated token is invalid");
+        CHECK(!JameHasValidAuditToken(shortAudit), "truncated delegated token is invalid");
+        CHECK(!JameHasValidAuditToken(longAudit), "oversized delegated token is invalid");
+        CHECK(JameHasValidAuditToken(completeAudit), "complete kernel audit token is valid");
+
+        // A full recursive block must not reinterpret a protocol-scoped
+        // imported rule as an unconditional block of both TCP and UDP.
+        // This eligibility function is also called by Rules.m in production.
+        CHECK(JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"*", nil),
+              "all-protocol directory block applies to the main executable");
+        CHECK(JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/Frameworks/Helper",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"*", @0),
+              "an explicit any-protocol directory block covers a nested helper");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"*", @6),
+              "TCP-only rule must not preempt all-protocol matching");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"*", @17),
+              "UDP-only rule must not preempt all-protocol matching");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app.backup/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"*", nil),
+              "sibling bundle must not be caught by unconditional block");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_ALLOW), NO,
+                  @"*", @"*", nil),
+              "allow directory rule cannot become a hard deny");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), YES,
+                  @"*", @"*", nil),
+              "disabled directory rule must not block");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"example.com", @"*", nil),
+              "host-limited directory rule is not a hard deny");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", @(RULE_STATE_BLOCK), NO,
+                  @"*", @"443", nil),
+              "port-limited directory rule is not a hard deny");
+        CHECK(!JameIsUnconditionalDirectoryBlockForPath(
+                  @"/Applications/Blocked.app/Contents/MacOS/main",
+                  @"/Applications/Blocked.app/*", nil, NO,
+                  @"*", @"*", nil),
+              "missing action must not silently become a hard block");
+        // Protocol-constrained rules must match the actual socket type,
+        // including sockets created with protocol 0 (system-chosen default).
+        CHECK(JameRuleProtocolMatchesSocket(nil, IPPROTO_TCP, SOCK_STREAM),
+              "legacy rule with no protocol matches TCP");
+        CHECK(JameRuleProtocolMatchesSocket(nil, IPPROTO_UDP, SOCK_DGRAM),
+              "legacy rule with no protocol matches UDP");
+        CHECK(JameRuleProtocolMatchesSocket(@0, IPPROTO_UDP, SOCK_DGRAM),
+              "explicit protocol 0 means all protocols");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_TCP, SOCK_STREAM),
+              "TCP rule matches a TCP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_UDP, SOCK_DGRAM),
+              "TCP rule must not match UDP");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_UDP, SOCK_DGRAM),
+              "UDP rule matches a UDP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_TCP, SOCK_STREAM),
+              "UDP rule must not match TCP");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_STREAM),
+              "TCP rule matches stream socket with implicit protocol");
+        CHECK(JameRuleProtocolMatchesSocket(@(IPPROTO_UDP), IPPROTO_IP, SOCK_DGRAM),
+              "UDP rule matches datagram socket with implicit protocol");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_DGRAM),
+              "TCP rule must not match implicit UDP socket");
+        CHECK(!JameRuleProtocolMatchesSocket(@(IPPROTO_TCP), IPPROTO_IP, SOCK_RAW),
+              "unknown implicit socket protocol must not match TCP");
+        CHECK(!JameRuleProtocolMatchesSocket(@(-1), IPPROTO_TCP, SOCK_STREAM),
+              "invalid negative protocol is not a wildcard");
+        CHECK(JameFlowDirectionIsSupported(NETrafficDirectionInbound), "inbound connections are processed");
+        CHECK(JameFlowDirectionIsSupported(NETrafficDirectionOutbound), "outbound connections are processed");
+        CHECK(!JameFlowDirectionIsSupported((NETrafficDirection)999), "unknown direction stays unsupported");
+        CHECK(JameNetworkRuleDirection() == NETrafficDirectionAny, "filter must register for both directions");
+        // Exercise the real NetworkExtension rule object used by the provider,
+        // not only a helper returning a direction enumeration.
+        NENetworkRule *catchAll = JameBidirectionalCatchAllRule();
+        CHECK(catchAll != nil, "catch-all filter network rule is constructible");
+        CHECK(catchAll.matchDirection == NETrafficDirectionAny,
+              "installed catch-all rule must match inbound AND outbound traffic");
+        CHECK(catchAll.matchProtocol == NENetworkRuleProtocolAny,
+              "installed catch-all rule must cover TCP and UDP sockets");
+        // Apple's catch-all rule with nil remote/local endpoints excludes
+        // loopback. Explicit IPv4/IPv6 loopback selectors must also match
+        // both directions or a protected app could receive localhost traffic.
+        NENetworkRule *loopback4 = JameBidirectionalLoopbackRule(NO);
+        NENetworkRule *loopback6 = JameBidirectionalLoopbackRule(YES);
+        CHECK(loopback4 != nil && loopback6 != nil,
+              "both loopback families must register concrete filter rules");
+        CHECK(loopback4.matchDirection == NETrafficDirectionAny,
+              "IPv4 loopback must be filtered inbound AND outbound");
+        CHECK(loopback6.matchDirection == NETrafficDirectionAny,
+              "IPv6 loopback must be filtered inbound AND outbound");
+        CHECK(loopback4.matchProtocol == NENetworkRuleProtocolAny &&
+              loopback6.matchProtocol == NENetworkRuleProtocolAny,
+              "IPv4 and IPv6 loopback must cover TCP and UDP");
+
+    }
+    if (failures) fprintf(stderr, "%d firewall policy assertion(s) failed\n", failures);
+    else puts("All jameLuLu policy tests passed");
+    return failures ? 1 : 0;
+}
