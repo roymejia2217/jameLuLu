@@ -18,7 +18,7 @@ jobs:
         runner: [macos-15-intel, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compile and run production policy tests
         run: |
           clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
@@ -67,7 +67,7 @@ jobs:
         runner: [macos-15-intel, macos-15]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Xcode project, schemes and entitlements
         run: |
           plutil -lint LuLu/LuLu.xcodeproj/project.pbxproj
@@ -114,7 +114,7 @@ jobs:
           APP="$RUNNER_TEMP/jamelulu-build/Build/Products/Release/jameLuLu.app"
           ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
           shasum -a 256 "$RUNNER_TEMP/jameLuLu-UNSIGNED-Release.zip"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: jameLuLu-UNSIGNED-Release-${{ matrix.runner }}
           path: ${{ runner.temp }}/jameLuLu-UNSIGNED-Release.zip
