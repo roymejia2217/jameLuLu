@@ -727,10 +727,12 @@ bail:
         {
             for(Rule* candidate in self.rules[key][KEY_RULES])
             {
-                if(RULE_STATE_BLOCK != candidate.action.intValue ||
-                   YES == candidate.isDisabled.boolValue ||
-                   YES != [candidate.endpointAddr isEqualToString:VALUE_ANY] ||
-                   YES != [candidate.endpointPort isEqualToString:VALUE_ANY])
+                // A hard deny is eligible only when the rule blocks every
+                // protocol, host and port. Scoped rules retain normal matching.
+                if(YES != JameIsUnconditionalDirectoryBlockForPath(
+                    process.path, candidate.path, candidate.action,
+                    candidate.isDisabled.boolValue, candidate.endpointAddr,
+                    candidate.endpointPort, candidate.protocol))
                     continue;
 
                 if(nil != candidate.expiration &&
@@ -740,8 +742,7 @@ bail:
                 if(nil != candidate.pid && candidate.pid.intValue != process.pid)
                     continue;
 
-                if(JamePathMatchesDirectoryRule(process.path, candidate.path))
-                    return candidate;
+                return candidate;
             }
         }
     }
