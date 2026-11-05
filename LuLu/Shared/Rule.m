@@ -51,6 +51,26 @@ static BOOL JameValidProtocolNumber(id value)
            number.doubleValue == (double)protocolValue;
 }
 
+// Importers and direct callers must never coerce unknown actions into 0,
+// which means Block. Legacy JSON may represent only "0" and "1" as strings.
+static NSNumber *JameNormalizedRuleAction(id value)
+{
+    if([value isKindOfClass:[NSString class]])
+    {
+        if([value isEqualToString:@"0"]) return @(RULE_STATE_BLOCK);
+        if([value isEqualToString:@"1"]) return @(RULE_STATE_ALLOW);
+        return nil;
+    }
+    if(YES != [value isKindOfClass:[NSNumber class]]) return nil;
+
+    NSNumber *number = (NSNumber *)value;
+    NSInteger actionValue = number.integerValue;
+    if((RULE_STATE_BLOCK != actionValue && RULE_STATE_ALLOW != actionValue) ||
+       number.doubleValue != (double)actionValue)
+        return nil;
+    return number;
+}
+
 @implementation Rule
 
 @synthesize scope;
@@ -164,8 +184,14 @@ static BOOL JameValidProtocolNumber(id value)
         //set type
         self.type = info[KEY_TYPE];
         
-        //init action
-        self.action = info[KEY_ACTION];
+        // An explicit valid decision is mandatory: never interpret nil or
+        // unrecognized text as Block when creating rules via XPC/UI.
+        self.action = JameNormalizedRuleAction(info[KEY_ACTION]);
+        if(nil == self.action)
+        {
+            os_log_error(logHandle, "ERROR: invalid or missing rule action");
+            return nil;
+        }
         
         //now, generate key
         if(nil != info[KEY_KEY])
@@ -914,16 +940,10 @@ bail:
             goto bail;
         }
         
-        self.action = info[NSStringFromSelector(@selector(action))];
-        if([self.action isKindOfClass:[NSString class]]) {
-            self.action = @([(NSString*)self.action integerValue]);
-        }
-        
-        if(YES != [self.action isKindOfClass:[NSNumber class]])
+        self.action = JameNormalizedRuleAction(info[NSStringFromSelector(@selector(action))]);
+        if(nil == self.action)
         {
-            //err msg
-            os_log_error(logHandle, "ERROR: 'action' should be a number, not %@", [self.action class]);
-            
+            os_log_error(logHandle, "ERROR: JSON rule action must be Block (0) or Allow (1)");
             self = nil;
             goto bail;
         }
