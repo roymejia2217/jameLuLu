@@ -6,6 +6,8 @@
 #import <NetworkExtension/NetworkExtension.h>
 #import <Network/Network.h>
 #import <mach/mach.h>
+#import <netinet/in.h>
+#import <sys/socket.h>
 #import "consts.h"
 
 // Apple's sourceApp/sourceProcess audit tokens are nullable NSData values.
@@ -60,6 +62,29 @@ NS_INLINE BOOL JameIsUnconditionalDirectoryBlockForPath(
     if(nil != protocol && 0 != protocol.integerValue)
         return NO;
     return JamePathMatchesDirectoryRule(processPath, rulePath);
+}
+
+// A rule without an explicit protocol is compatible with all legacy flows.
+// For SOCK_STREAM/SOCK_DGRAM sockets created using protocol 0, the kernel
+// supplies the default transport; do not lose TCP/UDP matches in this case.
+NS_INLINE BOOL JameRuleProtocolMatchesSocket(NSNumber *ruleProtocol,
+                                             int socketProtocol,
+                                             int socketType)
+{
+    if(nil == ruleProtocol || IPPROTO_IP == ruleProtocol.integerValue) return YES;
+
+    // Invalid protocol metadata cannot be interpreted as a wildcard.
+    if(ruleProtocol.integerValue < 0 || ruleProtocol.integerValue > UINT8_MAX)
+        return NO;
+
+    int actual = socketProtocol;
+    if(IPPROTO_IP == actual)
+    {
+        if(SOCK_STREAM == socketType) actual = IPPROTO_TCP;
+        else if(SOCK_DGRAM == socketType) actual = IPPROTO_UDP;
+    }
+
+    return ruleProtocol.intValue == actual;
 }
 
 NS_INLINE NETrafficDirection JameNetworkRuleDirection(void)
